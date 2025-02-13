@@ -3,7 +3,7 @@ use std::collections::HashMap;
 // Structure pour représenter une plage horaire
 #[derive(Default, Clone, Debug)]
 pub struct TimeSlot {
-    is_not_available: bool,
+    pub is_not_available: bool,
 }
 
 impl TimeSlot {
@@ -30,8 +30,8 @@ impl TimeSlot {
 #[derive(Clone, Debug)]
 pub struct Teacher {
     id: usize,
-    name: String,
-    schedule: HashMap<(usize,usize), TimeSlot>, // Clé : (jour,créneau ), Valeur : TimeSlot
+    pub name: String,
+    pub schedule: HashMap<(usize,usize), TimeSlot>, // Clé : (jour,créneau ), Valeur : TimeSlot
 }
 
 impl Teacher {
@@ -49,6 +49,10 @@ impl Teacher {
             schedule: self.schedule.clone(),
         }
     }*/
+    pub fn get_id(&self) -> usize{
+        self.id.clone()
+    }
+
     pub fn get_name(&self) -> String{
         self.name.clone()
     }

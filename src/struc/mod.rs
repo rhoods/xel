@@ -4,3 +4,4 @@ pub mod programme;
 pub mod filiere;
 pub mod classe;
 pub mod matiere;
+pub mod assignation;

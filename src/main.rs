@@ -44,7 +44,7 @@ fn creation_table() -> Result<()> {
                         id_hour INTEGER,
                         id_prof INTEGER,
                         not_available BOOLEAN,
-                        FOREIGN KEY (id_prof) REFERENCES Prof(id)
+                        FOREIGN KEY (id_prof) REFERENCES Prof(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -60,7 +60,7 @@ fn creation_table() -> Result<()> {
                         id INTEGER PRIMARY KEY,
                         name TEXT,
                         id_type_salle INTEGER,
-                        FOREIGN KEY (id_type_salle) REFERENCES TypeSalle(id)
+                        FOREIGN KEY (id_type_salle) REFERENCES TypeSalle(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -78,7 +78,7 @@ fn creation_table() -> Result<()> {
                         name TEXT,
                         nb_groupe INTEGER,
                         id_filiere INTEGER,
-                        FOREIGN KEY (id_filiere) REFERENCES Filiere(id)
+                        FOREIGN KEY (id_filiere) REFERENCES Filiere(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -107,7 +107,7 @@ fn creation_table() -> Result<()> {
                         id INTEGER PRIMARY KEY,
                         name TEXT,
                         id_type_salle INTEGER,
-                        FOREIGN KEY (id_type_salle) REFERENCES TypeSalle(id)
+                        FOREIGN KEY (id_type_salle) REFERENCES TypeSalle(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -122,8 +122,8 @@ fn creation_table() -> Result<()> {
                         groupe BOOLEAN,
                         nb_groupe INTEGER,
                         interclasse BOOLEAN,
-                        FOREIGN KEY (id_semaine, id_filiere) REFERENCES Semaine(id_semaine, id_filiere),
-                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id)
+                        FOREIGN KEY (id_semaine, id_filiere) REFERENCES Semaine(id_semaine, id_filiere) ON DELETE CASCADE,
+                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -133,8 +133,21 @@ fn creation_table() -> Result<()> {
                         id SERIAL PRIMARY KEY,
                         id_matiere_prog INTEGER,
                         id_classe INTEGER,
-                        FOREIGN KEY (id_matiere_prog) REFERENCES MatiereInterClasse(id),
-                        FOREIGN KEY (id_classe) REFERENCES Classe(id)
+                        FOREIGN KEY (id_matiere_prog) REFERENCES MatiereInterClasse(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE
+                    )",
+        ()
+    )?;
+
+    //une occurrence par classe par cours en interclasse
+    conn.execute("CREATE TABLE IF NOT EXISTS Groupe
+                    (
+                        id PRIMARY KEY,
+                        name TEXT,
+                        id_matiere INTEGER,
+                        id_classe INTEGER,
+                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -145,9 +158,11 @@ fn creation_table() -> Result<()> {
                         id_classe INTEGER,
                         id_matiere INTEGER,
                         id_prof INTEGER,
-                        FOREIGN KEY (id_classe) REFERENCES Classe(id),
-                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id),
-                        FOREIGN KEY (id_prof) REFERENCES Prof(id)
+                        id_groupe INTEGER,
+                        FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_prof) REFERENCES Prof(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_groupe) REFERENCES Groupe(id) ON DELETE CASCADE
                     )",
         ()
     )?;

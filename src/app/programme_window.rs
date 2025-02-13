@@ -2,6 +2,7 @@ use eframe::egui;
 use std::sync::{Arc, Mutex};
 //use egui::{Context, Ui, Color32, Align2, Frame, Vec2};
 use std::collections::{HashMap, HashSet};
+use crate::struc::assignation::Groupe;
 use crate::struc::matiere::Matiere;
 use crate::struc::programme::{MatiereProg, Semaine, MatiereInterClasse}; 
 //use crate::struc::filiere::Filiere;
@@ -15,6 +16,7 @@ use crate::app::room_window::RoomType;
 pub struct ProgrammeWindow {
  
     //programmes:   HashMap<usize, Arc<Programme>>
+    id_groupe: usize,
     new_nb_groupe: String,
     nb_groupe: HashMap<usize,Option<usize>>, 
     select_matiere_prog_remove_id: Option<usize>,
@@ -28,7 +30,7 @@ pub struct ProgrammeWindow {
     matiere_prog:   HashMap<usize, Arc<MatiereProg>>, //
     matiere_inter_classe:   HashMap<usize, Arc<MatiereInterClasse>>,
 
-
+    groupe: HashMap<usize, Arc<Groupe>>,
     filieres:  HashMap<usize, Arc<Filiere>>,
     classes:  HashMap<usize, Arc<Classe>>,
     matieres: HashMap<usize, Arc<Matiere>>,
@@ -52,6 +54,7 @@ pub struct ProgrammeWindow {
 impl  Default for ProgrammeWindow  {
     fn default() -> Self {
         Self {
+            id_groupe: 0,
             new_nb_groupe:String::new(),
             nb_groupe: HashMap::new(),
             select_matiere_prog_remove_id: None,
@@ -61,7 +64,8 @@ impl  Default for ProgrammeWindow  {
             selected_semaine_onglet: HashMap::new(),
             selected_semaines: HashMap::new(),
             matieres: HashMap::new(),
-            //programmes: HashMap::new(),// HashMap::new(),
+            //programmes: HashMap::new(),// HashMap::new()
+            groupe: HashMap::new(),
             semaines: HashMap::new(),
             id_matiere_prog:0,
             matiere_prog: HashMap::new(),
@@ -89,9 +93,10 @@ impl  Default for ProgrammeWindow  {
 
 impl ProgrammeWindow {
 
-    /*pub fn get_liste_programme(&self) -> &HashMap<usize, Arc<Programme>>{
-        &self.programmes
-    }*/
+    pub fn get_groupe(&self) -> &HashMap<usize, Arc<Groupe>>{
+        &self.groupe
+    }
+
     pub fn get_liste_semaine(&self) -> &HashMap<(usize,usize), Arc<Semaine>>{
         &self.semaines
     }
@@ -99,8 +104,9 @@ impl ProgrammeWindow {
         &self.matiere_prog
     }
 
-    pub fn charge(&mut self, semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>) {
+    pub fn charge(&mut self, groupe: HashMap<usize, Arc<Groupe>>,semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>) {
         
+            self.groupe = groupe;
             self.matieres =  matieres;
             self.semaines = semaines;
             self.matiere_prog = matiere_prog;
@@ -119,7 +125,7 @@ impl ProgrammeWindow {
             Some(id) => self.matiere_prog.remove(&id),
             None => None
         };
-
+        self.id_groupe = *self.groupe.keys().max().unwrap_or(&0) + 1;
         self.id_matiere_prog = self.matiere_prog.keys().max().unwrap_or(&0) + 1;
 
         egui::CentralPanel::default()
@@ -283,7 +289,7 @@ impl ProgrammeWindow {
                         
                             //POUR FACILITER LA SAISIE DES COURS PRESENTS SUR PLUSIEURS SEMAINES
                             ui.label("Liste des semaines auxquelles l'ajouter: ");
-                            egui::CollapsingHeader::new("Cliquez pour choisir")
+                            egui::CollapsingHeader::new("Selection des semaines")
                                 .show(ui, |ui| {
                                     let options: Vec<usize> = 
                                                     self.semaines.clone()//.iter()
@@ -342,8 +348,8 @@ impl ProgrammeWindow {
                             //SAUVEGARDE DES MATIERE AJOUTER A CHAQUE FILIERE     
                             let nb_groupe = match self.nb_groupe.get(&self.selected_filiere_id) {
                                 Some(Some(nb)) => nb,
-                                Some(&None) => &0,
-                                None => &0,
+                                Some(&None) => &1,
+                                None => &1,
                             };
                             let i: usize = 0;                  
                             for (cle, semaine) in self.semaines.iter().filter(|(id,_semaine)| {id.0 == self.selected_filiere_id}){
@@ -360,17 +366,31 @@ impl ProgrammeWindow {
                                                             )));
                                     self.id_matiere_prog += 1;
                                 }
+                            }
+
+                            for i in 0..*nb_groupe {
+                                for (id, classe) in self.classes.iter().filter(|(id, classe)| { classe.get_filiere().get_id() == self.selected_filiere_id}){
+                                    self.groupe.insert(self.id_groupe, Arc::new(Groupe::new(self.id_groupe,Arc::clone(classe), Arc::clone(self.liste_selected_matiere.get(&self.selected_filiere_id).unwrap()))));
+                                    self.id_groupe += 1;
+                                }
                             } 
                         }
 
                         //AFFICHAGE DES SEMAINES
-                        ui.horizontal(|ui| {
-                            for (id, _semaine) in self.semaines.iter().filter(|(id,_semaine)| {id.0 == self.selected_filiere_id}) {
-                                if ui.selectable_label(self.selected_semaine_onglet.get(&self.selected_filiere_id) == Some(&id.1),format!("{:}", id.1)).clicked() {                                  
-                                    self.selected_semaine_onglet.insert(self.selected_filiere_id, id.1);   
+                        egui::Grid::new("tableau1")
+                            .min_col_width(100.0)
+                            .striped(true)
+                            .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                for (id, _semaine) in self.semaines.iter().filter(|(id,_semaine)| {id.0 == self.selected_filiere_id}) {
+                                    if ui.selectable_label(self.selected_semaine_onglet.get(&self.selected_filiere_id) == Some(&id.1),format!("{:}", id.1)).clicked() {                                  
+                                        self.selected_semaine_onglet.insert(self.selected_filiere_id, id.1);   
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        });    
+                        
+                        
                         // AFFICHAGE DES MATIERES AJOUTEES A LA SEMAINE ET A LA FILIERE SELECTIONNEES
                         egui::ScrollArea::both().show(ui, |ui| {
                             egui::Grid::new("tableau")
@@ -396,7 +416,7 @@ impl ProgrammeWindow {
                                     });
                                     ui.label(" ");
                                     ui.end_row();
-
+                        
                                     for (i, matiere) in self.matiere_prog.iter()
                                         .filter(|(id, matiere_prog)| {matiere_prog.get_semaine().get_filiere().get_id() == self.selected_filiere_id 
                                         && Some(matiere_prog.get_semaine().get_id()) == self.selected_semaine_onglet.get(&self.selected_filiere_id)
@@ -421,24 +441,7 @@ impl ProgrammeWindow {
                                             if ui.button("❌").clicked() {
                                                 self.select_matiere_prog_remove_id = Some(*i);
                                             }
-                                        });
-
-                                        /*ui.vertical(|ui| {
-                                            for i in 0..2 {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("Groupe");
-                                                    if ui.button("-").clicked() {
-                                                        // Supprimer le groupe
-                                                    }
-                                                    if i == 1 {
-                                                        if ui.button("+").clicked() {
-                                                            // Ajouter un groupe
-                                                        }
-                                                    }
-                                                });
-                                            }
-                                        });*/
-
+                                        });                        
                                         ui.end_row();
                                     }
                                 });
