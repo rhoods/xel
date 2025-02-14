@@ -151,6 +151,15 @@ impl ProgrammeWindow {
                                 Ok(nombre) => {
                                     if nombre > 0 {
                                         self.nb_sem.insert(self.selected_filiere_id, Some(nombre));
+                                        let filiere = self.filieres.get_mut(&self.selected_filiere_id).unwrap();
+                                        //filiere.nb_semaine = nombre;
+                                        let mut name_guard = filiere.nb_semaine.lock().unwrap();
+                                        *name_guard = nombre;
+                                        drop(name_guard);
+
+
+
+                                        //filiere.set_nb_semaine(nombre);
                                     } else {
                                         self.new_nb_sem.clear();
                                     }  

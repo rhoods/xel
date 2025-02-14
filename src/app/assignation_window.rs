@@ -9,10 +9,8 @@ use crate::struc::matiere::Matiere;
 use crate::struc::teacher::{self, Teacher};
 use crate::struc::assignation::{Assignation, Groupe};
 use crate::struc::programme::{MatiereProg, Semaine, MatiereInterClasse}; 
-
-
 use crate::app::filiere_window::{Filiere, Classe};
-use crate::app::room_window::RoomType;
+use crate::app::room_window::{Room,RoomType};
 
 
 #[derive(Clone, Debug)]
@@ -341,7 +339,6 @@ impl AssignationWindow {
                         });                       
                     }
             });
-        /*Ok(())*/    
     }
 }
 

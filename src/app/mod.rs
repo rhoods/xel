@@ -6,3 +6,4 @@ pub mod programme_window;
 pub mod room_window;
 pub mod teachers_window;
 pub mod assignation_window;
+pub mod planning_windows;

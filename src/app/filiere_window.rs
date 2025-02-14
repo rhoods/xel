@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub struct Filiere {
     id: Arc<Mutex<usize>>,
     name: Arc<Mutex<String>>,
-    nb_semaine: usize,
+    pub nb_semaine:  Arc<Mutex<usize>>,
     programmes: Arc<Mutex<Option<HashMap<usize,Semaine>>>>,  //usize correspond au numéro de la semaine
 }
 /*impl Clone for Filiere {
@@ -27,7 +27,7 @@ impl Filiere   {
         Self {
             id: Arc::new(Mutex::new(id)),
             name: Arc::new(Mutex::new(name)),
-            nb_semaine: 0,
+            nb_semaine: Arc::new(Mutex::new(0)),
             programmes: Arc::new(Mutex::new(None)),
         }
     }
@@ -35,7 +35,7 @@ impl Filiere   {
         Self {
             id: Arc::new(Mutex::new(id)),
             name: Arc::new(Mutex::new(name)),
-            nb_semaine: nb_semaine,
+            nb_semaine: Arc::new(Mutex::new(nb_semaine)),
             programmes: Arc::new(Mutex::new(None)),
         }
     }
@@ -77,12 +77,13 @@ impl Filiere   {
     }*/
 
     pub fn get_nb_semaine(&self) -> Option<usize> {
-        Some(self.nb_semaine)
+        let name = self.nb_semaine.lock().unwrap();
+        Some(name.clone())
     }
 
-    pub fn set_nb_semaine(&mut self){
-        self.nb_semaine;
-    }
+    /*pub fn set_nb_semaine(&mut self, nombre: usize){
+        self.nb_semaine = nombre;
+    }*/
 
 }
 

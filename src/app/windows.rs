@@ -27,6 +27,7 @@ use crate::app::filiere_window::Classe;
 use crate::app::matiere_window::MatiereWindow as MatiereWindow;
 use crate::app::programme_window::ProgrammeWindow as ProgrammeWindow;
 use crate::app::assignation_window::AssignationWindow as AssignationWindow;
+use crate::app::planning_windows::PlanningWindow as PlanningWindow;
 
 
 
@@ -39,6 +40,7 @@ enum FenetreActive{
     Matieres,
     Programmes,
     Affectations,
+    Generation,
 }
 
 
@@ -59,6 +61,7 @@ pub struct SchedulerApp{
     show_programs_window: bool,
     show_classes_window: bool,
     show_assignments_window: bool,
+    show_generation_window: bool,
 
     // Données
     assignement : HashMap<usize, Arc<Assignation>>,
@@ -98,6 +101,7 @@ pub struct SchedulerApp{
     matiere_window: MatiereWindow,
     programme_window: ProgrammeWindow,
     assignation_window: AssignationWindow,
+    planning_window: PlanningWindow,
 }
 
 impl  Default for SchedulerApp{
@@ -116,6 +120,7 @@ impl  Default for SchedulerApp{
             show_programs_window: false,
             show_classes_window: false,
             show_assignments_window: false,
+            show_generation_window: false,
 
             assignement : HashMap::new(),
             groupe: HashMap::new(),
@@ -153,6 +158,7 @@ impl  Default for SchedulerApp{
             matiere_window: MatiereWindow::default(),
             programme_window: ProgrammeWindow::default(),
             assignation_window: AssignationWindow::default(),
+            planning_window: PlanningWindow::default(),
             
             
         }
@@ -199,6 +205,9 @@ impl  eframe::App for SchedulerApp {
                 ui.menu_button("Affectations",   |_ui| {
                     self.fenetre_active = FenetreActive::Affectations;
                 });
+                ui.menu_button("Generation",   |_ui| {
+                    self.fenetre_active = FenetreActive::Generation;
+                });
             });
         });
 
@@ -221,6 +230,9 @@ impl  eframe::App for SchedulerApp {
             }
             FenetreActive::Affectations => {
                 self.show_assignments_window(ctx);
+            }
+            FenetreActive::Generation => {
+                self.show_generations_window(ctx);  
             }
         }
 
@@ -325,14 +337,15 @@ impl  SchedulerApp {
     fn show_assignments_window(&mut self, ctx: &Context) {
         self.assignation_window.charge(self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone());
         self.assignation_window.build(ctx);
-        /*match self.assignation_window.build(ctx) {
-            Ok(_) => println!("Opération réussie."),
-            Err(e) => eprintln!("Erreur : {:?}", e),
-        }*/
         self.groupe = self.assignation_window.get_groupe().clone();
         self.assignement = self.assignation_window.get_assignement().clone();
 
     } //AssignationWindow
+
+    fn show_generations_window(&mut self, ctx: &Context){
+        self.planning_window.charge(self.rooms.clone(), self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone());
+        self.planning_window.build(ctx);
+    }
 
     fn sauvegarder(&self) -> Result<()> {
         //let mut fichier = File::create("teachers.txt")?; // Crée ou remplace le fichier
@@ -740,6 +753,7 @@ impl  SchedulerApp {
             show_programs_window: self.show_programs_window,
             show_classes_window: self.show_classes_window,
             show_assignments_window: self.show_assignments_window,
+            show_generation_window: self.show_generation_window,
             
             assignement : self.assignement.clone(),
             groupe: self.groupe.clone(),
@@ -778,6 +792,7 @@ impl  SchedulerApp {
             matiere_window: self.matiere_window.clone(),
             programme_window: self.programme_window.clone(),
             assignation_window: self.assignation_window.clone(),
+            planning_window: self.planning_window.clone(),
         }
     }
 }
