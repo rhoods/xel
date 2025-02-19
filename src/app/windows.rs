@@ -34,6 +34,7 @@ use crate::app::planning_windows::PlanningWindow as PlanningWindow;
 #[derive(Clone, Debug)]
 enum FenetreActive{
     Aucune,
+    Horaires,
     Professeurs,
     Salles,
     Filiere,
@@ -186,6 +187,9 @@ impl  eframe::App for SchedulerApp {
         egui::TopBottomPanel::top("onglets")
         .show(ctx, |ui| {
             egui::menu::bar(ui,   |ui| {
+                ui.menu_button("Horaires",   |_ui| {
+                    self.fenetre_active = FenetreActive::Horaires;
+                });
                 ui.menu_button("Professeurs",   |_ui| {
                     self.fenetre_active = FenetreActive::Professeurs;
                 });
@@ -213,6 +217,9 @@ impl  eframe::App for SchedulerApp {
 
         match self.fenetre_active {
             FenetreActive::Aucune => {}
+            FenetreActive::Horaires => {
+                self.show_horaires_window(ctx);  
+            }
             FenetreActive::Professeurs => {
                 self.show_teachers_window(ctx);  
             }
@@ -298,6 +305,12 @@ impl  eframe::App for SchedulerApp {
 
 
 impl  SchedulerApp {    
+
+    fn show_horaires_window(&mut self, ctx: &Context) {
+        //self.teacher_window.charge(self.teachers.clone());
+        //self.teacher_window.build(ctx);
+        //self.teachers = self.teacher_window.get_liste_teacher().clone();       
+    }
 
     fn show_teachers_window(&mut self, ctx: &Context) {
         self.teacher_window.charge(self.teachers.clone());

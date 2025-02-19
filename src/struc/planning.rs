@@ -11,6 +11,7 @@ pub struct Creneaux {
     pub id_prof: Option<usize>,
     pub id_classe: Option<usize>, //Option<Arc<Classe>>,
     pub id_salle: Option<usize>,//Option<Room>,
+    pub id_matiere: Option<usize>,//Option<Room>,
 }
 
 impl Creneaux{
@@ -19,6 +20,7 @@ impl Creneaux{
             id_prof: None,
             id_classe: None,
             id_salle: None,
+            id_matiere: None,
         }
     }
 
@@ -31,6 +33,9 @@ impl Creneaux{
     pub fn get_salle(&self) -> &Option<usize>{ // &Option<Room>{
         &self.id_salle
     }
+    pub fn get_matiere(&self) -> &Option<usize>{ // &Option<Room>{
+        &self.id_matiere
+    }
 
     pub fn set_prof(&mut self, prof: Option<usize>) { //Option<Teacher>) {
         self.id_prof = prof;
@@ -40,6 +45,9 @@ impl Creneaux{
     }
     pub fn set_salle(&mut self, salle: Option<usize>) { //Option<Room>) {
         self.id_salle = salle;
+    }
+    pub fn set_matiere(&mut self, matiere: Option<usize>) { //Option<Room>) {
+        self.id_matiere = matiere;
     }
 
 }
@@ -84,11 +92,12 @@ impl Planning {
     pub fn get_creneau(&self, id_jour: usize, id_heure: usize,) -> Option<&Creneaux> {
         self.planning.get(&(id_jour, id_heure))
     }
-    pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_salle: usize) {
+    pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_salle: usize, id_matiere: usize) {
         let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();   
         creneaux.id_classe =  Some(id_classe);
         creneaux.id_prof =  Some(id_prof);
         creneaux.id_salle =  Some(id_salle);
+        creneaux.id_matiere =  Some(id_matiere);
 
     }
 
@@ -120,5 +129,9 @@ impl Planning {
             None => (jour, heure, false)
         }
 
+    }
+
+    pub fn get_nb_heure(&self) -> &usize{
+        &self.numero_semaine
     }
 }

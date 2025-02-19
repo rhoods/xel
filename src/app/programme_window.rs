@@ -122,8 +122,46 @@ impl ProgrammeWindow {
     pub fn build(&mut self, ctx: &egui::Context) {
         //egui::TopBottomPanel::top("onglets_filiere") //::new("Création des programmes")
         match self.select_matiere_prog_remove_id {
-            Some(id) => self.matiere_prog.remove(&id),
-            None => None
+            Some(id) => {  
+                                        /*if let Some(matiere_prog) = self.matiere_prog.get(&id){
+                                            let id_matiere = matiere_prog.get_matiere().get_id();
+                                            
+                                            for(id_classe, classe) in self.classes.iter()
+                                                .filter(|(id_classe, classe)| {classe.get_filiere().get_id() == self.selected_filiere_id}){
+                                                for (id_groupe, groupe) in self.groupe.iter_mut(){
+                                                    if groupe.get_classe().get_id() == *id_classe && groupe.get_matiere().get_id() == id_matiere{
+                                                        self.groupe.remove(&id_groupe);
+                                                    }
+                                                }
+                                            }
+                                            
+                                        }*/
+                                        //if  self.matiere_prog.contains_key(&id) {
+                                        if let Some(matiere_prog) = self.matiere_prog.get(&id) {
+                                            //let matiere_prog = self.matiere_prog.get(&id).unwrap();
+                                            let matiere = matiere_prog.get_matiere() ;
+                                            let id_matiere = matiere.get_id();
+                                
+                                            // Collect ids to remove to avoid modifying the collection while iterating
+                                            let ids_to_remove: Vec<_> = self.classes.iter()
+                                                .filter(|(_, classe)| classe.get_filiere().get_id() == self.selected_filiere_id)
+                                                .flat_map(|(id_classe, _)| {
+                                                    self.groupe.iter()
+                                                        .filter(move |(_, groupe)| groupe.get_classe().get_id() == *id_classe && groupe.get_matiere().get_id() == id_matiere)
+                                                        .map(|(id_groupe, _)| id_groupe.clone())
+                                                })
+                                                .collect();
+                                
+                                            // Remove the collected ids
+                                            for id_groupe in ids_to_remove {
+                                                self.groupe.remove(&id_groupe);
+                                            }
+                                        }  
+                                 
+                                    self.matiere_prog.remove(&id); 
+                                    self.select_matiere_prog_remove_id = None
+                                },
+            None => self.select_matiere_prog_remove_id = None
         };
         self.id_groupe = *self.groupe.keys().max().unwrap_or(&0) + 1;
         self.id_matiere_prog = self.matiere_prog.keys().max().unwrap_or(&0) + 1;
@@ -282,6 +320,9 @@ impl ProgrammeWindow {
                                             }
                                         }
                                     }
+                                }else{
+                                    self.nb_groupe.insert(self.selected_filiere_id, Some(1));
+                                    self.new_nb_groupe.clear();
                                 }
                                 
                                 
@@ -425,7 +466,7 @@ impl ProgrammeWindow {
                                     });
                                     ui.label(" ");
                                     ui.end_row();
-                        
+                                    
                                     for (i, matiere) in self.matiere_prog.iter()
                                         .filter(|(id, matiere_prog)| {matiere_prog.get_semaine().get_filiere().get_id() == self.selected_filiere_id 
                                         && Some(matiere_prog.get_semaine().get_id()) == self.selected_semaine_onglet.get(&self.selected_filiere_id)

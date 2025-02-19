@@ -1,6 +1,7 @@
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 
+use egui::{/*Context, Ui,*/ Color32, /*Align2,*/ Frame, Vec2};
 use rusqlite::{params, Connection, Result};
 
 //use egui::{Context, Ui, Color32, Align2, Frame, Vec2};
@@ -16,6 +17,8 @@ use crate::app::room_window::{Room,RoomType};
 
 #[derive(Clone, Debug)]
 pub struct PlanningWindow {
+    selected_semaine_id: usize,
+    selected_prof_id: usize,
     generation_reussi: bool,
     nb_semaine_max: usize,
     nb_semaine_max_par_filiere: HashMap<usize, usize>,// (id_filiere, nb_semaine)
@@ -40,6 +43,8 @@ pub struct PlanningWindow {
 impl  Default for PlanningWindow  {
     fn default() -> Self {
         Self {
+            selected_semaine_id: 0,
+            selected_prof_id: 0,
             generation_reussi: true,
             nb_semaine_max: 0,
             nb_semaine_max_par_filiere: HashMap::new(),
@@ -90,10 +95,122 @@ impl PlanningWindow {
                             print!("Echec...");
                         }
                     }
-                    
+                });  
+                ui.horizontal(|ui| {
+                    for (id_prof, prof) in self.teachers.iter() {
+                            if ui.selectable_label(&self.selected_prof_id == id_prof,format!("{:}", prof.get_name())).clicked() {                                  
+                                self.selected_prof_id = *id_prof; 
+                            }   
+                    }
+                });
 
-                });    
-            });
+                ui.horizontal(|ui| {
+                    for ((id_prof,id_semaine), planning) in self.planning_prof.iter()
+                    .filter(|((id_prof_planning,id_semaine), planning)| {self.selected_prof_id == *id_prof_planning}) 
+                    {
+                        if ui.selectable_label(&self.selected_semaine_id == id_semaine,format!("{:}", id_semaine)).clicked() {                                  
+                            self.selected_semaine_id = *id_semaine;
+                        }
+                    }
+                });
+
+                    
+                    
+                        ui.visuals_mut().selection.bg_fill = Color32::TRANSPARENT; //enleve l'effet de selection sur les label du planning (changement couleur du fond)
+                        ui.separator();
+
+                        ui.heading("Planning");
+                        let cell_size = Vec2::new(100.0, 30.0);
+                        let days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
+                        let hours = [
+                            "8h-9h", "9h-10h", "10h-11h", "11h-12h", "12h-13h", "13h-14h",
+                            "14h-15h", "15h-16h", "16h-17h", "17h-18h",
+                        ];
+                        
+                        egui::Grid::new("schedule_grid")
+                        .show(ui, |ui| {
+                            // En-têtes des colonnes
+                            ui.label("");
+
+                            for (id_day,day) in days.iter().enumerate() {
+                                //genere les noms de colonnes
+                                let response_day= ui.add_sized(cell_size, egui::SelectableLabel::new(false, *day));
+                                if response_day.clicked() {
+                                    for hour_idx in 0..hours.len() {
+                                        //teacher.set_availability(id_day, hour_idx);
+                                    } 
+                                }              
+                            }
+
+                            ui.end_row();
+                            
+                            let mut dispo: (usize,usize,bool);
+                            let mut creneau: Option<&Creneaux>;
+                            for (hour_idx, hour) in hours.iter().enumerate() {
+                                //genere les noms des plages horaires
+                                let response_hours = ui.add_sized(cell_size, egui::SelectableLabel::new(false,*hour)); //ui.label(*hour);
+                                //permet de cliquer sur l'heure pour changer l'état de cette plage horaire pour chaque journée
+                                if response_hours.clicked() {
+                                    for id_day in 0..days.len() {
+                                        //teacher.set_availability(id_day, hour_idx);
+                                    } 
+                                }
+                           
+                                for days_idx in 0..days.len() {
+
+                                    if self.planning_prof.contains_key(&(self.selected_prof_id, self.selected_semaine_id)){
+                                        let planning = self.planning_prof.get(&(self.selected_prof_id, self.selected_semaine_id)).unwrap();
+                                        dispo  = planning.get_verif_creneau(days_idx, hour_idx);
+                                        creneau = planning.get_creneau(days_idx, hour_idx);
+                                    }else{
+                                        dispo  = (days_idx, hour_idx, true);
+                                        creneau = None;
+                                    }  
+                                    
+                                    // Définition des couleurs d'arrière-plan
+                                    let (bg_color, text_color) = if !dispo.2 && !creneau.is_none(){
+                                        (Color32::from_rgb(255, 200, 200), Color32::RED)  // Rouge clair pour indisponible
+                                    } else {
+                                        (Color32::from_rgb(200, 255, 200), Color32::DARK_GREEN)  // Vert clair pour disponible
+                                    };
+
+                                    //dbg!(&creneau);
+                                    let text = 
+                                        if !dispo.2 && !creneau.is_none() { 
+                                            let prof = self.teachers.get(&creneau.unwrap().id_prof.unwrap()).unwrap();
+                                            let classe = self.classe.get(&creneau.unwrap().id_classe.unwrap()).unwrap();
+                                            let salle = self.salle.get(&creneau.unwrap().id_salle.unwrap()).unwrap();
+                                            let matiere = self.matiere.get(&creneau.unwrap().id_matiere.unwrap()).unwrap();
+
+                                            format!("{:} \n {:} \n {:} \n {:}", prof.get_name(), classe.get_name(), salle.get_name(), matiere.get_name()) 
+                                        } else { 
+                                            format!("{:} \n {:} \n {:} \n {:}", " ".to_string(), " ".to_string(), " ".to_string(), " ".to_string()) 
+                                        };
+                                    // Création d'un Frame aHashMap la couleur d'arrière-plan
+                                    Frame::none()
+                                        .fill(bg_color)
+                                        .inner_margin(egui::style::Margin::symmetric(4.0, 0.0))
+                                        .show(ui, |ui| {
+                                            let response = ui.add_sized(
+                                                cell_size,
+                                                egui::SelectableLabel::new(
+                                                    dispo.2,
+                                                    egui::RichText::new(text).color(text_color)
+                                                )
+                                            );
+                                            
+                                            /*if response.clicked() {
+                                                teacher.set_availability(days_idx, hour_idx);
+
+                                            }*/
+                                        });
+                                }
+                                ui.end_row();
+                            }
+                        });
+
+                });
+        //    });
     }
 
     pub fn create_planning(&mut self) {
@@ -165,44 +282,63 @@ impl PlanningWindow {
         for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), nb_heure) in self.liste_creneau_a_placer.iter(){
             let mut nb_heure_restant = *nb_heure;
             let mut nb_max_passage = 0;
-            let mut creneau_dispo: (usize,usize,bool); 
+            let mut creneau_dispo: (usize,usize,bool) = (0,0,false); 
             let mut creneau_dispo_salle: (usize,usize,bool) = (0,0,false); 
             let mut id_salle: usize = 0;
+            
             match self.matiere.get(id_matiere){
                 Some(matiere) => id_type_salle = matiere.get_room_type().get_id(),
-                None => { println!(" id matiere non trouvé dans liste des matiere"); dbg!(&self.matiere); dbg!(&self.matiere); break; },
+                None => {   
+                            println!(" id matiere non trouvé dans liste des matiere"); 
+                            break; 
+                        },
             };
-            
 
             while nb_heure_restant > 0 {
                 //dbg!(&nb_max_passage);
                 if nb_max_passage > 20 {
                     break;
                 }
-                //dbg!(&id_prof);
-                //dbg!(&id_semaine);
-                //dbg!(&self.planning_prof);
-                //dbg!(&self.planning_prof.get(&(*id_prof, *id_semaine)));
-                match self.planning_prof.get(&(*id_prof, *id_semaine)){
-                    Some(planning) => {
-                                                    //planning_prof = planning; 
-                                                    creneau_dispo = planning.get_verif_random_creneau();
-                                                    if creneau_dispo.2{
-                                                        dbg!(&creneau_dispo);
-                                                    }
-                                                 },
-                    None => {nb_max_passage += 1;
-                             continue;
-                            },
-                };
-                if !creneau_dispo.2 {
-                    nb_max_passage += 1;
-                    continue;
-                }
 
+
+                //essaye de placer un créneaux sur l'heure suivante
+                if creneau_dispo.2 {
+
+                    match self.planning_prof.get(&(*id_prof, *id_semaine)){
+                        Some(planning) => {
+                                                        if (creneau_dispo.1 + 1) >= *planning.get_nb_heure(){
+                                                            creneau_dispo = (0,0,false);
+                                                        }else{
+                                                            creneau_dispo.1 += 1; //on verifie si l'heure suivante est disponible
+                                                            creneau_dispo = planning.get_verif_creneau(creneau_dispo.0, creneau_dispo.1);
+                                                        }
+                                                        
+                                                    },
+                        None => {nb_max_passage += 1;
+                                continue;
+                                },
+                    };
+                }else{
+                    // verifie dispo prof
+                    match self.planning_prof.get(&(*id_prof, *id_semaine)){
+                        Some(planning) => {
+                                                        //planning_prof = planning; 
+                                                        creneau_dispo = planning.get_verif_random_creneau();
+                                                    },
+                        None => {nb_max_passage += 1;
+                                continue;
+                                },
+                    };
+                }
+                    if !creneau_dispo.2 {
+                        nb_max_passage += 1;
+                        continue;
+                    }
+                
+                // verifie dispo classe
                 match self.planning_classe.get(&(*id_classe, *id_semaine)){
                     Some(planning) => {
-                                                    //planning_classe = planning;
+                                                    
                                                     creneau_dispo = planning.get_verif_creneau(creneau_dispo.0, creneau_dispo.1);
                                                 },
                     None => {nb_max_passage += 1; continue;},
@@ -226,20 +362,15 @@ impl PlanningWindow {
                 }else{
                     //CRENEAU TROUVE
                     let planning_prof = self.planning_prof.get_mut(&(*id_prof, *id_semaine)).unwrap();
-                    planning_prof.set_creneau(creneau_dispo.0, creneau_dispo.1, *id_prof, *id_classe, id_salle);
-
+                    planning_prof.set_creneau(creneau_dispo.0, creneau_dispo.1, *id_prof, *id_classe, id_salle, *id_matiere);
                     let planning_classe = self.planning_classe.get_mut(&(*id_classe, *id_semaine)).unwrap();
-                    planning_classe.set_creneau(creneau_dispo.0, creneau_dispo.1, *id_prof, *id_classe, id_salle);
-
+                    planning_classe.set_creneau(creneau_dispo.0, creneau_dispo.1, *id_prof, *id_classe, id_salle, *id_matiere);
                     let planning_salle = self.planning_room.get_mut(&(id_salle, id_type_salle, *id_semaine)).unwrap();
-                    planning_salle.set_creneau(creneau_dispo.0, creneau_dispo.1, *id_prof, *id_classe, id_salle);
+                    planning_salle.set_creneau(creneau_dispo.0, creneau_dispo.1, *id_prof, *id_classe, id_salle, *id_matiere);
                     
                     nb_heure_restant -= 1;
                 }
-
-
-                println!("{:}, {:}, {:}", creneau_dispo.0, creneau_dispo.1, creneau_dispo.2);
-                
+              
                 
                 nb_max_passage += 1;
                 

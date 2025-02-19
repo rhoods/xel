@@ -88,7 +88,7 @@ impl  MatiereProg  {
         self.en_groupe = !self.en_groupe; 
     }
     pub fn get_en_groupe_inter_classe(&self) -> &bool {
-        &self.en_groupe
+        &self.en_groupe_inter_classe
     }
 
     pub fn get_semaine(&self) -> Arc<Semaine>{
