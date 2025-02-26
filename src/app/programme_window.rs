@@ -37,6 +37,11 @@ pub struct ProgrammeWindow {
     salles_type: HashMap<usize, Arc<RoomType>>,
     //new_matiere: String,
 
+    new_duree_minimum: HashMap<usize,String>,
+    duree_minimum: HashMap<usize, Option<usize>>,
+    new_duree_maximum: HashMap<usize,String>,
+    duree_maximum: HashMap<usize, Option<usize>>,
+
     new_nb_heure: HashMap<usize,String>,
     nb_heure: HashMap<usize, Option<usize>>,
     new_nb_sem: String,
@@ -73,6 +78,11 @@ impl  Default for ProgrammeWindow  {
             filieres: HashMap::new(),
             classes:  HashMap::new(),
             salles_type: HashMap::new(),
+            
+            new_duree_minimum: HashMap::new(),
+            duree_minimum: HashMap::new(),
+            new_duree_maximum: HashMap::new(),
+            duree_maximum: HashMap::new(),
             
             new_nb_heure: HashMap::new(),
             nb_heure: HashMap::new(),
@@ -117,6 +127,14 @@ impl ProgrammeWindow {
             for (id, filiere) in self.filieres.iter(){
                 self.nb_sem.insert(*id,filiere.get_nb_semaine());
             }
+            for (id, matiere_prog) in self.matiere_prog.iter(){
+                self.duree_minimum.insert(*id,Some(*matiere_prog.get_duree_minimum()));
+            }
+            for (id, matiere_prog) in self.matiere_prog.iter(){
+                self.duree_maximum.insert(*id,Some(*matiere_prog.get_duree_maximum()));
+            }
+
+
     }
 
     pub fn build(&mut self, ctx: &egui::Context) {
@@ -194,10 +212,6 @@ impl ProgrammeWindow {
                                         let mut name_guard = filiere.nb_semaine.lock().unwrap();
                                         *name_guard = nombre;
                                         drop(name_guard);
-
-
-
-                                        //filiere.set_nb_semaine(nombre);
                                     } else {
                                         self.new_nb_sem.clear();
                                     }  
@@ -293,6 +307,63 @@ impl ProgrammeWindow {
                                     }
                                 }
                             });
+
+
+                            ////Duree des creneaux min et max
+                            ui.horizontal(|ui| {
+                                ui.label("durée minimum d'un cours: ");
+                                let mut nb_heure =
+                                    match self.new_duree_minimum.get(&self.selected_filiere_id) {
+                                        Some(duree) => duree.clone(),
+                                        None => String::new()
+                                    };                           
+                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
+                                self.new_duree_minimum.insert(self.selected_filiere_id, nb_heure.clone() );
+                                if response_nb_heure.lost_focus() {
+                                    match self.new_duree_minimum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                        Ok(nombre) => {
+                                            if nombre > 0 {
+                                                self.duree_minimum.insert(self.selected_filiere_id, Some(nombre));
+                                            } else {
+                                                self.new_duree_minimum.clear();
+                                                self.duree_minimum.insert(self.selected_filiere_id, Some(0));
+                                            }  
+                                        },
+                                        Err(_) => {
+                                            self.new_duree_minimum.clear();
+                                            self.duree_minimum.insert(self.selected_filiere_id, Some(0));
+                                        }
+                                    }
+                                }
+
+                                ui.label("durée maximum d'un cours: ");
+                                let mut nb_heure =
+                                    match self.new_duree_maximum.get(&self.selected_filiere_id) {
+                                        Some(duree) => duree.clone(),
+                                        None => String::new()
+                                    };                           
+                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
+                                self.new_duree_maximum.insert(self.selected_filiere_id, nb_heure.clone() );
+                                if response_nb_heure.lost_focus() {
+                                    match self.new_duree_maximum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                        Ok(nombre) => {
+                                            if nombre > 0 {
+                                                self.duree_maximum.insert(self.selected_filiere_id, Some(nombre));
+                                            } else {
+                                                self.new_duree_maximum.clear();
+                                                self.duree_maximum.insert(self.selected_filiere_id, Some(0));
+                                            }  
+                                        },
+                                        Err(_) => {
+                                            self.new_duree_maximum.clear();
+                                            self.duree_maximum.insert(self.selected_filiere_id, Some(0));
+                                        }
+                                    }
+                                }
+                            });
+
+
+
                             ui.horizontal(|ui| {
                                 let mut en_groupe =
                                     match self.selected_en_groupe.get(&self.selected_filiere_id) {
@@ -324,7 +395,6 @@ impl ProgrammeWindow {
                                     self.nb_groupe.insert(self.selected_filiere_id, Some(1));
                                     self.new_nb_groupe.clear();
                                 }
-                                
                                 
                                 let mut en_groupe_inter =
                                     match self.selected_en_groupe_interclasse.get(&self.selected_filiere_id) {
@@ -409,6 +479,8 @@ impl ProgrammeWindow {
                                         Arc::new(MatiereProg::new( self.id_matiere_prog,
                                                              Arc::clone(self.liste_selected_matiere.get(&self.selected_filiere_id).unwrap()),
                                                              self.nb_heure.get(&self.selected_filiere_id).unwrap().unwrap(), 
+                                                             self.duree_minimum.get(&self.selected_filiere_id).unwrap().unwrap(), 
+                                                             self.duree_maximum.get(&self.selected_filiere_id).unwrap().unwrap(), 
                                                              *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false),
                                                              *nb_groupe,
                                                              *self.selected_en_groupe_interclasse.get(&self.selected_filiere_id).unwrap_or(&false), 
@@ -444,7 +516,7 @@ impl ProgrammeWindow {
                         // AFFICHAGE DES MATIERES AJOUTEES A LA SEMAINE ET A LA FILIERE SELECTIONNEES
                         egui::ScrollArea::both().show(ui, |ui| {
                             egui::Grid::new("tableau")
-                                .num_columns(6)
+                                .num_columns(8)
                                 .striped(true)
                                 .spacing((10.0,10.0))
                                 .min_col_width(100.0)
@@ -454,6 +526,12 @@ impl ProgrammeWindow {
                                     });
                                     ui.vertical_centered(|ui| {
                                         ui.label("Nombre d'heure(s)");
+                                    });
+                                    ui.vertical_centered(|ui| {
+                                        ui.label("Durée minimum");
+                                    });
+                                    ui.vertical_centered(|ui| {
+                                        ui.label("Durée maximum");
                                     });
                                      ui.vertical_centered(|ui| {
                                         ui.label("Cours en groupe?");
@@ -477,6 +555,12 @@ impl ProgrammeWindow {
                                         });
                                         ui.vertical_centered(|ui| {
                                             ui.label(format!("{:}", matiere.get_nb_heure()));
+                                        });
+                                        ui.vertical_centered(|ui| {
+                                            ui.label(format!("{:}", matiere.get_duree_minimum()));
+                                        });
+                                        ui.vertical_centered(|ui| {
+                                            ui.label(format!("{:}", matiere.get_duree_maximum()));
                                         });
                                         ui.vertical_centered(|ui| {
                                             ui.label(format!("{:}", matiere.get_en_groupe().to_string()));

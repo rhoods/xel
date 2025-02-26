@@ -6,9 +6,12 @@ use rusqlite::{params, Connection, Result};
 
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use crate::struc::teacher;
+
+
+use crate::struc::horaire::{CreneauxEtablissement, TypeCreneau};
+use crate::struc::teacher::{Teacher, Etat};
 //use crate::struc::programme::MatiereProg;
-use crate::struc::{teacher::Teacher,  matiere::Matiere, programme::{Semaine, MatiereProg, MatiereInterClasse}};
+use crate::struc::{ matiere::Matiere, programme::{Semaine, MatiereProg, MatiereInterClasse}};
 
 use crate::struc::assignation::{Assignation, Groupe};
 
@@ -28,6 +31,8 @@ use crate::app::matiere_window::MatiereWindow as MatiereWindow;
 use crate::app::programme_window::ProgrammeWindow as ProgrammeWindow;
 use crate::app::assignation_window::AssignationWindow as AssignationWindow;
 use crate::app::planning_windows::PlanningWindow as PlanningWindow;
+
+use super::horaire_window::HoraireWindow;
 
 
 
@@ -63,8 +68,11 @@ pub struct SchedulerApp{
     show_classes_window: bool,
     show_assignments_window: bool,
     show_generation_window: bool,
+    show_horaire_window: bool,
 
     // Données
+    
+    horaires: HashMap<(usize,usize), CreneauxEtablissement>,
     assignement : HashMap<usize, Arc<Assignation>>,
     groupe: HashMap<usize, Arc<Groupe>>,
     teachers: HashMap<usize,Teacher>,
@@ -77,6 +85,7 @@ pub struct SchedulerApp{
     semaines: HashMap<(usize,usize),Arc<Semaine>>,
     matieres_prog: HashMap<usize,Arc<MatiereProg>>,
     matieres_inter_classe: HashMap<usize,Arc<MatiereInterClasse>>,
+    selected_liste_inter_classe: HashMap<(usize,usize,usize), usize>,
 
     // Données temporaires pour les nouvelles entrées
     new_teacher: String,
@@ -96,6 +105,8 @@ pub struct SchedulerApp{
     id_programme: usize,
     id_matiere: usize,
     window_position: egui::Pos2, // Coordonnées (x, y) pour afficher les fenêtres
+
+    horaire_window: HoraireWindow,
     teacher_window: TeacherWindow,
     room_window: RoomWindow,
     classe_window: ClasseWindow,
@@ -122,7 +133,9 @@ impl  Default for SchedulerApp{
             show_classes_window: false,
             show_assignments_window: false,
             show_generation_window: false,
+            show_horaire_window: false,
 
+            horaires: HashMap::new(),
             assignement : HashMap::new(),
             groupe: HashMap::new(),
             teachers: HashMap::new(),
@@ -135,6 +148,7 @@ impl  Default for SchedulerApp{
             semaines: HashMap::new(),
             matieres_prog: HashMap::new(),
             matieres_inter_classe:HashMap::new(),
+            selected_liste_inter_classe:HashMap::new(),
 
             new_teacher: String::new(),
             new_room: String::new(),
@@ -153,6 +167,7 @@ impl  Default for SchedulerApp{
             id_programme: 1,
             id_matiere: 1,
             window_position: egui::Pos2::new(0.0, 20.0), // Par exemple, x=200, y=100
+            horaire_window: HoraireWindow::default(),
             teacher_window: TeacherWindow::default(),
             room_window: RoomWindow::default(),
             classe_window: ClasseWindow::default(),
@@ -252,6 +267,7 @@ impl  eframe::App for SchedulerApp {
                         ui.label("Attention, la sauvegarde précédente sera supprimée");  
                         ui.horizontal(|(ui)| {
                             if ui.button("Valider").clicked(){
+                                dbg!(&self.selected_liste_inter_classe);
                                 let reset = self.reset_bdd();
                                 match reset {
                                     Ok(_) => println!("reset bdd termine")
@@ -307,13 +323,13 @@ impl  eframe::App for SchedulerApp {
 impl  SchedulerApp {    
 
     fn show_horaires_window(&mut self, ctx: &Context) {
-        //self.teacher_window.charge(self.teachers.clone());
-        //self.teacher_window.build(ctx);
-        //self.teachers = self.teacher_window.get_liste_teacher().clone();       
+        self.horaire_window.charge(self.horaires.clone());
+        self.horaire_window.build(ctx);
+        self.horaires = self.horaire_window.get_liste_horaires().clone();       
     }
 
     fn show_teachers_window(&mut self, ctx: &Context) {
-        self.teacher_window.charge(self.teachers.clone());
+        self.teacher_window.charge(self.teachers.clone(), self.horaires.clone());
         self.teacher_window.build(ctx);
         self.teachers = self.teacher_window.get_liste_teacher().clone();       
     }
@@ -348,10 +364,11 @@ impl  SchedulerApp {
     }
 
     fn show_assignments_window(&mut self, ctx: &Context) {
-        self.assignation_window.charge(self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone());
+        self.assignation_window.charge(self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone(), self.selected_liste_inter_classe.clone());
         self.assignation_window.build(ctx);
         self.groupe = self.assignation_window.get_groupe().clone();
         self.assignement = self.assignation_window.get_assignement().clone();
+        self.selected_liste_inter_classe = self.assignation_window.get_selected_inter_classe().clone();
 
     } //AssignationWindow
 
@@ -364,13 +381,20 @@ impl  SchedulerApp {
         //let mut fichier = File::create("teachers.txt")?; // Crée ou remplace le fichier
         let conn = Connection::open("C:/Users/admin/source/repos/xel/bdd/bdd.db")?;
 
+        let mut insert_horaire = conn.prepare("INSERT INTO Horaires (id_jour, id_heure, name_jour, name_heure, type_creneau) VALUES (?1, ?2, ?3, ?4, ?5)")?;
+       
+        for ((id_jour,id_heure), creneau) in self.horaires.iter() {
+            insert_horaire.execute(rusqlite::params![id_jour,id_heure, creneau.get_name_jour(), creneau.get_name_heure(), creneau.get_dispo().to_int()])?;
+        }
+
         //sauvegarde prof
         let mut insert_prof = conn.prepare("INSERT INTO Prof (id, name) VALUES (?1, ?2)")?;
-        let mut insert_creneaux = conn.prepare("INSERT INTO Creneaux (id_day, id_hour, id_prof, not_available) VALUES (?1, ?2, ?3, ?4)")?;
+        let mut insert_creneaux = conn.prepare("INSERT INTO Creneaux (id_day, id_hour, id_prof, etat) VALUES (?1, ?2, ?3, ?4)")?;
         for (cle, teacher) in self.teachers.iter() {
             insert_prof.execute(rusqlite::params![cle, teacher.get_name()])?;
-            for (id_creneau, not_available) in teacher.get_not_available_liste() {
-                insert_creneaux.execute(rusqlite::params![id_creneau.0,id_creneau.1 , cle, not_available.get_available()])?;
+            for (id_creneau, timeslot) in teacher.get_not_available_liste() {
+                //insert_creneaux.execute(rusqlite::params![id_creneau.0,id_creneau.1 , cle, not_available.get_available()])?;
+                insert_creneaux.execute(rusqlite::params![id_creneau.0,id_creneau.1 , cle, timeslot.get_available().to_int()/*not_available.get_available()*/])?;
             }
         }
 
@@ -408,7 +432,7 @@ impl  SchedulerApp {
         //sauvegarde programme
         //let mut insert_programme = conn.prepare("INSERT INTO Programme (id, nb_semaine, id_filiere) VALUES (?1, ?2, ?3)")?;
         let mut insert_semaine = conn.prepare("INSERT INTO Semaine (id_semaine, id_filiere) VALUES (?1, ?2)")?;
-        let mut insert_matiere_prog = conn.prepare("INSERT INTO MatiereProg (id, id_semaine, id_filiere, id_matiere, nb_heure, groupe, nb_groupe, interclasse ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)")?;
+        let mut insert_matiere_prog = conn.prepare("INSERT INTO MatiereProg (id, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)")?;
         let mut insert_en_groupe_inter_classe = conn.prepare("INSERT INTO MatiereInterClasse (id, id_matiere_prog, id_classe) VALUES (?1, ?2, ?3)")?;
         let mut insert_groupe = conn.prepare("INSERT INTO Groupe (id, id_matiere,id_classe) values (?1, ?2, ?3)")?;
         let mut insert_assignement = conn.prepare("INSERT INTO Assignement (id, id_classe, id_matiere, id_prof, id_groupe) values (?1, ?2, ?3, ?4, ?5)")?;
@@ -420,11 +444,12 @@ impl  SchedulerApp {
         }
 
         for(cle_matiere_prog, matiere_prog) in self.matieres_prog.iter() {
-            insert_matiere_prog.execute(rusqlite::params![cle_matiere_prog, matiere_prog.get_semaine().get_id(),matiere_prog.get_semaine().get_filiere().get_id() , matiere_prog.get_matiere().get_id(), matiere_prog.get_nb_heure(),matiere_prog.get_en_groupe(),matiere_prog.get_nb_groupe(), matiere_prog.get_en_groupe_inter_classe()])?;
+            insert_matiere_prog.execute(rusqlite::params![cle_matiere_prog, matiere_prog.get_semaine().get_id(),matiere_prog.get_semaine().get_filiere().get_id() , matiere_prog.get_matiere().get_id(), matiere_prog.get_nb_heure() , matiere_prog.get_duree_minimum() , matiere_prog.get_duree_maximum() ,matiere_prog.get_en_groupe(),matiere_prog.get_nb_groupe(), matiere_prog.get_en_groupe_inter_classe()])?;
         }
-
-        for (cle_en_groupe, matiere_inter) in self.matieres_inter_classe.iter(){
-            insert_en_groupe_inter_classe.execute(rusqlite::params![cle_en_groupe, matiere_inter.get_matiere_prog().get_id(), matiere_inter.get_classe().get_id()])?;
+        // selected_liste_classe: HashMap<(usize,usize,usize), Arc<Classe>>, //(id_classe,id_matiere_prog i), id_classe  
+        
+        for ((id_classe, id_matiere_prog, id), classe) in self.selected_liste_inter_classe.iter(){
+            insert_en_groupe_inter_classe.execute(rusqlite::params![id, id_matiere_prog, id_classe])?;
         }
 
         //dbg!(&self.groupe);
@@ -445,14 +470,30 @@ impl  SchedulerApp {
         //let mut fichier = File::create("teachers.txt")?; // Crée ou remplace le fichier
         let conn = Connection::open("C:/Users/admin/source/repos/xel/bdd/bdd.db")?;
 
+        let mut recup_horaires = conn.prepare("SELECT id_jour, id_heure, name_jour, name_heure, type_creneau FROM Horaires")?;
         let mut recup_prof = conn.prepare("SELECT Prof.id, Prof.name FROM Prof")?;
-        let mut recup_creneaux_prof = conn.prepare("SELECT id_prof, id_day, id_hour, not_available FROM Creneaux")?;
+        let mut recup_creneaux_prof = conn.prepare("SELECT id_prof, id_day, id_hour, etat FROM Creneaux")?;
         let mut recup_room_type = conn.prepare("SELECT id, name FROM TypeSalle")?;
         let mut recup_room = conn.prepare("SELECT id, name, id_type_salle FROM Salle")?;
         let mut recup_filiere = conn.prepare("SELECT id, name, nb_semaines FROM Filiere")?;
         let mut recup_classe = conn.prepare("SELECT id, name, nb_groupe, id_filiere FROM Classe")?;
         let mut recup_matiere = conn.prepare("SELECT id, name, id_type_salle FROM Matiere")?;
         
+        //horaires
+        let rows = recup_horaires.query_map([], |row| {
+            let id_jour: usize = row.get(0)?;
+            let id_heure: usize = row.get(1)?;
+            let name_jour: String = row.get(2)?;
+            let name_heure: String = row.get(3)?;
+            let available: TypeCreneau = TypeCreneau::from_int(row.get(4)?);
+            Ok((id_jour, id_heure, name_jour, name_heure, available))
+        })?;
+
+        for row in rows {
+            let (id_jour, id_heure, name_jour, name_heure, available) = row?;
+            self.horaires.insert((id_jour,id_heure), CreneauxEtablissement::charge_creneau(id_jour, id_heure, name_jour, name_heure, available));
+        }
+                
         //prof
         let rows = recup_prof.query_map([], |row| {
                     let id_prof: usize = row.get(0)?;
@@ -470,7 +511,7 @@ impl  SchedulerApp {
             let id_prof: usize = row.get(0)?;
             let id_day: usize = row.get(1)?;
             let id_hour: usize = row.get(2)?;
-            let not_available: bool = row.get(3)?;
+            let not_available: Etat = Etat::from_int(row.get(3)?);
             Ok((id_prof, id_day, id_hour, not_available))
         })?;
 
@@ -478,7 +519,7 @@ impl  SchedulerApp {
             let (id_prof, id_day, id_hour, not_available) = row?;
             match self.teachers.get_mut(&id_prof) {
                 Some(teacher) => teacher.charge_creneau(id_day, id_hour, not_available),
-                None => println!("Aucune valeur"),
+                None => println!("horaire: Aucune valeur"),
             }
         }
 
@@ -576,23 +617,25 @@ impl  SchedulerApp {
         }
 
 
-        let mut recup_matiere_prog = conn.prepare("SELECT id, id_semaine,id_filiere, id_matiere, nb_heure, groupe,nb_groupe, interclasse FROM MatiereProg")?;
+        let mut recup_matiere_prog = conn.prepare("SELECT id, id_semaine,id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe,nb_groupe, interclasse FROM MatiereProg")?;
         let rows = recup_matiere_prog.query_map([], |row| {
             let id_matiere_prog: usize = row.get(0)?;
             let id_semaine: usize = row.get(1)?;
             let id_filiere: usize = row.get(2)?;
             let id_matiere: usize = row.get(3)?;
             let nb_heure: usize = row.get(4)?;
-            let groupe: bool = row.get(5)?;
-            let nb_groupe: usize = row.get(6)?;
-            let interclasse: bool = row.get(7)?;
-            Ok((id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, groupe, nb_groupe, interclasse))
+            let duree_minimum: usize = row.get(5)?;
+            let duree_maximum: usize = row.get(6)?;
+            let groupe: bool = row.get(7)?;
+            let nb_groupe: usize = row.get(8)?;
+            let interclasse: bool = row.get(9)?;
+            Ok((id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse))
         })?;
 
         for row in rows {
-            let (id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, groupe, nb_groupe, interclasse) = row?;
+            let (id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse) = row?;
             match (self.semaines.get_key_value(&(id_filiere,id_semaine)), self.matieres.get_key_value(&id_matiere) ) {
-                (Some(semaine), Some(matiere)) => self.matieres_prog.insert(id_matiere_prog, Arc::new(MatiereProg::new(id_semaine,Arc::clone(matiere.1), nb_heure, groupe,  nb_groupe, interclasse, Arc::clone(semaine.1))), ),
+                (Some(semaine), Some(matiere)) => self.matieres_prog.insert(id_matiere_prog, Arc::new(MatiereProg::new(id_semaine,Arc::clone(matiere.1), nb_heure, duree_minimum, duree_maximum, groupe,  nb_groupe, interclasse, Arc::clone(semaine.1))), ),
                 _ => None,
             };
         }
@@ -608,10 +651,12 @@ impl  SchedulerApp {
         for row in rows {
             let (id_matiere_inter_classe, id_matiere_prog, id_classe) = row?;
             match (self.matieres_prog.get_key_value(&id_matiere_prog), self.classes.get_key_value(&id_classe) ) {
-                (Some(matiere_prog), Some(classe)) => self.matieres_inter_classe.insert(id_matiere_inter_classe, Arc::new(MatiereInterClasse::new(id_matiere_inter_classe,Arc::clone(matiere_prog.1), Arc::clone(classe.1))), ),
+                (Some(matiere_prog), Some(classe)) => self.selected_liste_inter_classe.insert((id_classe, id_matiere_prog, id_matiere_inter_classe), id_classe),
                 _ => None,
             };
         }
+        
+
 
 
 
@@ -648,6 +693,7 @@ impl  SchedulerApp {
                 _ => None,
             };
         }
+
 
         Ok(())
 
@@ -708,6 +754,8 @@ impl  SchedulerApp {
 
         let conn = Connection::open("C:/Users/admin/source/repos/xel/bdd/bdd.db")?;
 
+        
+        let mut reset_horaires = conn.prepare("DELETE FROM Horaires")?;
         let mut reset_assignement = conn.prepare("DELETE FROM Assignement")?;
         let mut reset_groupe = conn.prepare("DELETE FROM Groupe")?;
         let mut reset_creneaux = conn.prepare("DELETE FROM Creneaux")?;
@@ -721,14 +769,17 @@ impl  SchedulerApp {
         let mut reset_filiere = conn.prepare("DELETE FROM Filiere")?;
         let mut reset_type_salle = conn.prepare("DELETE FROM TypeSalle")?;
 
-        reset_assignement.execute(())?;
+        reset_horaires.execute(())?;
+
+        reset_matiere_inter.execute(())?;
         conn.execute("VACUUM;", [])?;
+        reset_assignement.execute(())?;
+        conn.execute("VACUUM;", [])?; //reini pk
         reset_creneaux.execute(())?;
         conn.execute("VACUUM;", [])?;
         reset_prof.execute(())?;
         conn.execute("VACUUM;", [])?;
-        reset_matiere_inter.execute(())?;
-        conn.execute("VACUUM;", [])?;
+        
         reset_matiere_prog.execute(())?;
         conn.execute("VACUUM;", [])?;
         reset_semaine.execute(())?;
@@ -767,7 +818,9 @@ impl  SchedulerApp {
             show_classes_window: self.show_classes_window,
             show_assignments_window: self.show_assignments_window,
             show_generation_window: self.show_generation_window,
+            show_horaire_window: self.show_horaire_window,
             
+            horaires: self.horaires.clone(),
             assignement : self.assignement.clone(),
             groupe: self.groupe.clone(),
             teachers: self.teachers.clone(),
@@ -780,6 +833,7 @@ impl  SchedulerApp {
             semaines: self.semaines.clone(),
             matieres_prog: self.matieres_prog.clone(),
             matieres_inter_classe: self.matieres_inter_classe.clone(),
+            selected_liste_inter_classe: self.selected_liste_inter_classe.clone(),
             
             new_teacher: self.new_teacher.clone(),
             new_room: self.new_room.clone(),
@@ -799,6 +853,7 @@ impl  SchedulerApp {
             id_matiere: self.id_matiere,
             
             window_position: self.window_position,
+            horaire_window: self.horaire_window.clone(),
             teacher_window: self.teacher_window.clone(),
             room_window: self.room_window.clone(),
             classe_window: self.classe_window.clone(),

@@ -34,7 +34,7 @@ pub struct AssignationWindow {
     selected_option_id: Option<usize>,
     selected_prof: HashMap<(usize,usize,usize), usize>, //(id_classe, id_matiere, id_groupe), id_prof
     selected_all: HashMap<(usize, usize),bool>, //(id_classe,id_matiere_prog)
-    selected_liste_classe: HashMap<(usize,usize,usize), Arc<Classe>>, //(id_classe,id_matiere_prog i), id_classe  
+    selected_liste_classe: HashMap<(usize,usize,usize), usize>, //(id_classe,id_matiere_prog i), id_classe   ////Arc<Classe>
 }
 
 
@@ -77,8 +77,12 @@ impl AssignationWindow {
                                                                                                                                                                                                                
     }
 
+    pub fn get_selected_inter_classe(&self) -> &HashMap<(usize,usize,usize), usize>{
+        &self.selected_liste_classe                                                                                                                                                                          
+                                                                                                                                                                                                               
+    }
 
-    pub fn charge(&mut self, semaine: HashMap<(usize,usize), Arc<Semaine>>, classe: HashMap<usize, Arc<Classe>>, filiere: HashMap<usize, Arc<Filiere>>, matiere:HashMap<usize, Arc<Matiere>>,   matiere_prog: HashMap<usize, Arc<MatiereProg>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, teachers: HashMap<usize, Teacher>, groupe: HashMap<usize, Arc<Groupe>>,  assignement :HashMap<usize, Arc<Assignation>>) {
+    pub fn charge(&mut self, semaine: HashMap<(usize,usize), Arc<Semaine>>, classe: HashMap<usize, Arc<Classe>>, filiere: HashMap<usize, Arc<Filiere>>, matiere:HashMap<usize, Arc<Matiere>>,   matiere_prog: HashMap<usize, Arc<MatiereProg>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, teachers: HashMap<usize, Teacher>, groupe: HashMap<usize, Arc<Groupe>>,  assignement :HashMap<usize, Arc<Assignation>>, selected_liste_classe: HashMap<(usize,usize,usize), usize>) {
         
         self.semaine = semaine;
         self.classe =  classe;
@@ -105,6 +109,7 @@ impl AssignationWindow {
             //dbg!(&self.selected_prof);
             self.selected_option.insert((classe.get_id(), *matiere.get_id(), *groupe.get_id()), prof.get_name());
         }
+        self.selected_liste_classe = selected_liste_classe;
     }
 
     pub fn build(&mut self, ctx: &egui::Context,) /*-> Result<()>*/ {
@@ -283,7 +288,7 @@ impl AssignationWindow {
                                                     let options: Vec<Arc<Classe>> = 
                                                                     self.classe.clone()//.iter()
                                                                     .values()
-                                                                    .filter(|classe| {classe.get_filiere().get_id() == self.selected_filiere_id})
+                                                                    .filter(|classe| {classe.get_filiere().get_id() == self.selected_filiere_id && self.selected_classe_id != Some(classe.get_id())})
                                                                     .map(|classe| Arc::clone(classe))
                                                                     .collect();
                                                     
@@ -303,9 +308,9 @@ impl AssignationWindow {
                                                                 self.selected_all.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1), selected);
                                                                 for (_cle,option) in options.iter().enumerate(){
                                                                     if selected{
-                                                                        self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,i),Arc::clone(option));   
+                                                                        self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,option.get_id()),self.selected_classe_id.unwrap());   //Arc::clone(option)
                                                                     }else {
-                                                                        self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, i));
+                                                                        self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, option.get_id()));
                                                                     }
                                                                     i += 1 ;
                                                                 }
@@ -313,13 +318,13 @@ impl AssignationWindow {
     
                                                             i = 0;
                                                             for (_cle,option) in options.iter().enumerate(){
-                                                                let mut selected = self.selected_liste_classe.contains_key(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, i));
+                                                                let mut selected = self.selected_liste_classe.contains_key(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, option.get_id()));
                                                
                                                                 if ui.checkbox(&mut selected, format!("{:}",option.get_name())).changed() {
                                                                     if selected {
-                                                                        self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,i), Arc::clone(option));
+                                                                        self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,option.get_id()), self.selected_classe_id.unwrap());// Arc::clone(option)
                                                                     } else {
-                                                                        self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(),id_matiere_prog.1, i));
+                                                                        self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(),id_matiere_prog.1, option.get_id()));
                                                                         self.selected_all.insert((self.selected_classe_id.unwrap(),id_matiere_prog.1), false);
                                                                     }
                                                                 }

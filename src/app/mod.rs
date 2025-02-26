@@ -7,3 +7,4 @@ pub mod room_window;
 pub mod teachers_window;
 pub mod assignation_window;
 pub mod planning_windows;
+pub mod horaire_window;

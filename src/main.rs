@@ -43,7 +43,7 @@ fn creation_table() -> Result<()> {
                         id_day INTEGER,
                         id_hour INTEGER,
                         id_prof INTEGER,
-                        not_available BOOLEAN,
+                        etat INTEGER,
                         FOREIGN KEY (id_prof) REFERENCES Prof(id) ON DELETE CASCADE
                     )",
         ()
@@ -82,15 +82,16 @@ fn creation_table() -> Result<()> {
                     )",
         ()
     )?;
-    /*conn.execute("CREATE TABLE IF NOT EXISTS Programme
+    conn.execute("CREATE TABLE IF NOT EXISTS Horaires
                     (
-                        id INTEGER PRIMARY KEY,
-                        nb_semaine INTEGER,
-                        id_filiere INTEGER,
-                        FOREIGN KEY (id_filiere) REFERENCES Filiere(id)
+                        id_jour INTEGER,
+                        id_heure INTEGER,
+                        name_jour TEXT, 
+                        name_heure TEXT,
+                        type_creneau INTEGER
                     )",
-        ()
-    )?;*/
+        []
+    )?;
 
     //PRIMARY KEY
     conn.execute("CREATE TABLE IF NOT EXISTS Semaine
@@ -119,6 +120,8 @@ fn creation_table() -> Result<()> {
                         id_filiere INTEGER,
                         id_matiere INTEGER,
                         nb_heure INTEGER,
+                        duree_minimum INTEGER,
+                        duree_maximum INTEGER,
                         groupe BOOLEAN,
                         nb_groupe INTEGER,
                         interclasse BOOLEAN,
@@ -130,10 +133,10 @@ fn creation_table() -> Result<()> {
     //une occurrence par classe par cours en interclasse
     conn.execute("CREATE TABLE IF NOT EXISTS MatiereInterClasse
                     (
-                        id SERIAL PRIMARY KEY,
+                        id INTEGER,
                         id_matiere_prog INTEGER,
                         id_classe INTEGER,
-                        FOREIGN KEY (id_matiere_prog) REFERENCES MatiereInterClasse(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_matiere_prog) REFERENCES MatiereProg(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE
                     )",
         ()

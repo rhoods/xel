@@ -43,9 +43,11 @@ impl MatiereInterClasse {
 
 #[derive(Clone, Debug)]
 pub struct MatiereProg  {
-    id:usize,
-    matiere:  Arc<Matiere>, //mettre le meme id pour matiere et nb_heure
-    nb_heure:  usize,
+    id: usize,
+    matiere: Arc<Matiere>, //mettre le meme id pour matiere et nb_heure
+    nb_heure: usize,
+    duree_minimum: usize,
+    duree_maximum: usize,
     en_groupe: bool,
     nb_groupe: usize,
     en_groupe_inter_classe: bool,
@@ -53,11 +55,13 @@ pub struct MatiereProg  {
     //liste_classe: Arc<HashMap<usize, Arc<Classe>>>
 }
 impl  MatiereProg  {
-    pub fn  new( id:usize, matiere: Arc<Matiere>, nb_heure:usize, en_groupe: bool, nb_groupe: usize, en_groupe_inter_classe: bool,semaine: Arc<Semaine>) -> Self {
+    pub fn  new( id:usize, matiere: Arc<Matiere>, nb_heure:usize, duree_minimum:usize, duree_maximum:usize, en_groupe: bool, nb_groupe: usize, en_groupe_inter_classe: bool,semaine: Arc<Semaine>) -> Self {
         Self {
             id,
             matiere,
             nb_heure,
+            duree_minimum,
+            duree_maximum,
             en_groupe,
             nb_groupe,
             en_groupe_inter_classe,
@@ -65,7 +69,6 @@ impl  MatiereProg  {
             //liste_classe: Arc::new(HashMap::new()),
         }
     }
-
     pub fn get_id(&self) -> &usize {
         &self.id
     }
@@ -78,6 +81,14 @@ impl  MatiereProg  {
     }*/
     pub fn get_nb_heure(&self) -> &usize {
         &self.nb_heure
+    }
+
+    pub fn get_duree_minimum(&self) -> &usize {
+        &self.duree_minimum
+    }
+
+    pub fn get_duree_maximum(&self) -> &usize {
+        &self.duree_maximum
     }
 
     pub fn get_en_groupe(&self) -> &bool {

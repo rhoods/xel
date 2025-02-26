@@ -1,28 +1,66 @@
 use std::collections::HashMap;
+use crate::struc::horaire::CreneauxEtablissement;
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Etat {
+    Indisponible,
+    Disponible,
+    Preference,
+}
+
+impl Etat {
+    pub fn suivant(&mut self) -> Self {
+        match self {
+            Etat::Indisponible => Etat::Disponible,
+            Etat::Disponible => Etat::Preference,
+            Etat::Preference => Etat::Indisponible,
+        }
+    }
+
+    pub fn to_int(&self) -> i8 {
+        match self {
+            Etat::Indisponible => 0,
+            Etat::Disponible => 1,
+            Etat::Preference => 2,
+        }
+    }
+
+    pub fn from_int(value: i8) -> Self {
+        match value {
+            0 => Etat::Indisponible,
+            1 => Etat::Disponible,
+            2 => Etat::Preference,
+            _ => Etat::Indisponible, // Valeur par défaut en cas d'erreur
+        }
+    }
+}
 
 // Structure pour représenter une plage horaire
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct TimeSlot {
-    pub is_not_available: bool,
+    pub etat: Etat,
+}
+impl Default for  TimeSlot{
+    fn default() -> Self {
+        Self { etat: Etat::Disponible }
+    }
 }
 
 impl TimeSlot {
-    fn update(&mut self) {
-        self.is_not_available = !self.is_not_available;
+    pub fn update(&mut self) {
+        self.etat = self.etat.suivant();
     }
-    pub fn get_available(&self) -> bool {
-        self.is_not_available
+    pub fn get_available(&self) -> &Etat {
+        &self.etat
     }
-
-    pub fn set_available(&mut self, not_available: bool) {
-        self.is_not_available = not_available;
+    pub fn set_available(&mut self, not_available: Etat) {
+        self.etat = not_available;
     }
-    pub fn charge(&mut self, not_available: bool)  {
-        self.is_not_available = not_available;
-     
+    pub fn charge(&mut self, not_available: Etat)  {
+        self.etat = not_available;
     }
-
-
 }
 
 // Structure pour représenter un professeur et ses disponibilités
@@ -42,13 +80,14 @@ impl Teacher {
             schedule: HashMap::new(),
         }
     }
-    /*pub fn update(&self, new_name: String) -> Self{
-        Self {
-            id: self.id,
-            name:new_name,
-            schedule: self.schedule.clone(),
-        }
-    }*/
+    pub fn update(&mut self, id_jour: usize, id_heure: usize) {
+        self.schedule.get_mut(&(id_jour, id_heure)).unwrap().update();
+    }
+    pub fn init_schedule(&mut self, id_jour: usize, id_heure: usize) {
+        self.schedule.insert((id_jour, id_heure), TimeSlot::default());
+       
+    }
+
     pub fn get_id(&self) -> usize{
         self.id.clone()
     }
@@ -60,23 +99,13 @@ impl Teacher {
         self.name = new_name;
     }
 
-   /* pub fn set_availability(&mut self, day: usize, hour: usize, is_not_available: bool) {
-        let slot = self.schedule.entry((day, hour)).or_default();
-        slot.is_not_available = is_not_available;
-    }
-
-    pub fn is_available(&self, day: usize, hour: usize) -> bool {
-        !self.schedule
-            .get(&(day, hour))
-            .map_or(false, |slot| slot.is_not_available)
-    }*/
     pub fn set_availability(&mut self, day: usize, hour: usize){
         self.schedule.entry((day,hour)).or_insert(TimeSlot::default()).update();
-        //self.schedule[day][hour].update();
+        let etat = self.schedule.get_mut(&(day,hour)).unwrap();
+        etat.update(); //.suivant();
     }
-    pub fn get_available(&self, day: usize, hour: usize) -> bool {
-        self.schedule.get(&(day,hour)).map_or(false, |slot| slot.get_available())
-        //self.schedule[day][hour].get_available()
+    pub fn get_available(&self, day: usize, hour: usize) -> Option<&TimeSlot> {
+        self.schedule.get(&(day,hour))
     }
 
     pub fn get_creneau_mut(&mut self, day: usize, hour: usize ) -> Option<&mut TimeSlot>{
@@ -86,18 +115,11 @@ impl Teacher {
         &self.schedule
 
     }
-    pub fn charge_creneau(&mut self, day:usize, hour:usize, not_available: bool) {
+    pub fn charge_creneau(&mut self, day:usize, hour:usize, not_available: Etat) {
         let mut time_slot = TimeSlot::default();
         time_slot.charge(not_available);
         self.schedule.entry((day,hour)).or_insert(time_slot);
     }
 
 
-}
-
-#[derive(Clone, Debug)]
-pub struct PlanningTeacher {
-    id: usize,
-    teacher: Teacher,
-    schedule: Vec<Vec<Option<usize>>>, // Clé : (jour, créneau), Valeur : id de la classe
 }

@@ -1,6 +1,9 @@
-use eframe::egui;
-use egui::{/*Context, Ui,*/ Color32, /*Align2,*/ Frame, Vec2};
-use crate::struc::teacher::Teacher;
+use eframe::egui::{self, Button};
+use egui::{/*Context, Ui,*/ Color32, /*Align2,*/ Frame, Vec2, Sense, Label, Rect, Id};
+use crate::struc::teacher::{Teacher, Etat};
+
+use crate::struc::horaire::{CreneauxEtablissement, TypeCreneau};
+use crate::app::horaire_window::HoraireWindow;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -9,7 +12,7 @@ pub struct TeacherWindow {
     teachers: HashMap<usize, Teacher>,
     new_teacher: String,
     
-    
+    horaires: HashMap<(usize,usize), CreneauxEtablissement>,
     selected_teacher_id: Option<usize>,
     editing_teacher_id: Option<usize>,
     supp_teacher_id: Option<usize>,
@@ -28,6 +31,7 @@ impl Default for TeacherWindow {
     fn default() -> Self {
         Self {
             show_teachers_window: true,
+            horaires: HashMap::new(), 
             teachers:  HashMap::new(),
             new_teacher: String::new(),
 
@@ -53,8 +57,9 @@ impl TeacherWindow {
         &self.teachers
     }
 
-    pub fn charge(&mut self, teachers: HashMap<usize, Teacher>,) {
+    pub fn charge(&mut self, teachers: HashMap<usize, Teacher>, horaires:HashMap<(usize, usize), CreneauxEtablissement> ) {
         self.teachers = teachers;
+        self.horaires = horaires;
     }
     
     pub fn build(&mut self, ctx: &egui::Context) {
@@ -151,76 +156,113 @@ impl TeacherWindow {
                         ui.heading("Planning de disponibilité");
                         let cell_size = Vec2::new(100.0, 30.0);
 
-                        let days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
-                        let hours = [
-                            "8h-9h", "9h-10h", "10h-11h", "11h-12h", "12h-13h", "13h-14h",
-                            "14h-15h", "15h-16h", "16h-17h", "17h-18h",
-                        ];
-                        
-                        
-                        egui::Grid::new("schedule_grid")
-                        .show(ui, |ui| {
-                            // En-têtes des colonnes
-                            ui.label("");
-                            
 
-                            for (id_day,day) in days.iter().enumerate() {
-                                //genere les noms de colonnes
-                                let response_day= ui.add_sized(cell_size, egui::SelectableLabel::new(false, *day)); // ;label(*day);
-                                //permet de cliquer sur le jour pour changer l'état des toutes les heures de la journée
-                                if response_day.clicked() {
-                                    for hour_idx in 0..hours.len() {
-                                        teacher.set_availability(id_day, hour_idx);
-                                    } 
-                                }              
+
+                        let nb_jour = self.horaires.keys().map(|(id_jour,_id_heure)| { id_jour}).max();
+                        let nb_heure = self.horaires.keys().map(|(_id_jour,id_heure)| { id_heure}).max();
+                        //let mut liste_id_jours: Vec<usize> = vec![0; nb_jour.unwrap() + 1];
+                        //let mut liste_id_heures: Vec<usize> = vec![0; nb_heure.unwrap() + 1];
+                        if !nb_jour.is_none() && !nb_heure.is_none(){
+                            let mut jours: Vec<(usize, String)> = vec![(0,String::new()); nb_jour.unwrap() + 1];
+                            let mut heures: Vec<(usize, String)> = vec![(0,String::new()); nb_heure.unwrap() + 1];
+                            for ((id_jour, id_heure), creneau) in self.horaires.iter(){
+                                //liste_id_jours[*id_jour]= *id_jour;
+                                //liste_id_heures[*id_heure] = *id_heure;
+
+                                jours[*id_jour]= (*id_jour,format!("{:}",creneau.get_name_jour()));
+                                heures[*id_heure] = (*id_heure,format!("{:}",creneau.get_name_heure()));
                             }
-
-                            ui.end_row();
+                            jours.sort_by_key(|(id,_)| {*id});
+                            heures.sort_by_key(|(id,_)| {*id});
                             
-                            for (hour_idx, hour) in hours.iter().enumerate() {
-                                //genere les noms des plages horaires
-                                let response_hours = ui.add_sized(cell_size, egui::SelectableLabel::new(false,*hour)); //ui.label(*hour);
-                                //permet de cliquer sur l'heure pour changer l'état de cette plage horaire pour chaque journée
-                                if response_hours.clicked() {
-                                    for id_day in 0..days.len() {
-                                        teacher.set_availability(id_day, hour_idx);
-                                    } 
-                                }
+
+
+                            /*let days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
+                            let hours = [
+                                "8h-9h", "9h-10h", "10h-11h", "11h-12h", "12h-13h", "13h-14h",
+                                "14h-15h", "15h-16h", "16h-17h", "17h-18h",
+                            ];*/
+                            
+                            
+                            egui::Grid::new("schedule_grid")
+                            .show(ui, |ui| {
+                                // En-têtes des colonnes
+                                ui.label("");
                                 
-                                for days_idx in 0..days.len() {
 
-                                    let is_not_available = teacher.get_available(days_idx, hour_idx);
-                                    
-                                    // Définition des couleurs d'arrière-plan
-                                    let (bg_color, text_color) = if is_not_available {
-                                        (Color32::from_rgb(255, 200, 200), Color32::RED)  // Rouge clair pour indisponible
-                                    } else {
-                                        (Color32::from_rgb(200, 255, 200), Color32::DARK_GREEN)  // Vert clair pour disponible
-                                    };
-                                    let text = if is_not_available { "Indisponible" } else { "Disponible" };
-                                    // Création d'un Frame aHashMap la couleur d'arrière-plan
-                                    Frame::none()
-                                        .fill(bg_color)
-                                        .inner_margin(egui::style::Margin::symmetric(4.0, 0.0))
-                                        .show(ui, |ui| {
-                                            let response = ui.add_sized(
-                                                cell_size,
-                                                egui::SelectableLabel::new(
-                                                    is_not_available,
-                                                    egui::RichText::new(text).color(text_color)
-                                                )
-                                            );
-                                            
-                                            if response.clicked() {
-                                                teacher.set_availability(days_idx, hour_idx);
-
+                                for (id_day,day) in jours.iter().enumerate() {
+                                    //genere les noms de colonnes
+                                    let response_day= ui.add_sized(cell_size, egui::SelectableLabel::new(false, day.1.clone())); // ;label(*day);
+                                    //permet de cliquer sur le jour pour changer l'état des toutes les heures de la journée
+                                    //if response_day.clicked() {
+                                        for hour_idx in 0..heures.len() {
+                                            //teacher.set_availability(id_day, hour_idx);
+                                            if let Some(creneau) = self.horaires.get(&(id_day, hour_idx)){
+                                                if creneau.get_dispo() != TypeCreneau::Desactive{
+                                                    if teacher.schedule.get(&(id_day, hour_idx)).is_none(){
+                                                        teacher.init_schedule(id_day, hour_idx);
+                                                    }
+                                                    if response_day.clicked(){
+                                                        teacher.set_availability(id_day, hour_idx);
+                                                    }
+                                                }
                                             }
-                                        });
+                                            
+
+                                        } 
+                                    //}              
                                 }
+
                                 ui.end_row();
-                            }
-                        });
-                        
+                                
+                                for (hour_idx, hour) in heures.iter().enumerate() {
+                                    
+                                    //genere les noms des plages horaires
+                                    let response_hours = ui.add_sized(cell_size, egui::SelectableLabel::new(false,hour.1.clone())); //ui.label(*hour);
+                                    //permet de cliquer sur l'heure pour changer l'état de cette plage horaire pour chaque journée
+                                    
+                                    
+                                    for days_idx in 0..jours.len() {
+                                        if let Some(time_slot) = teacher.get_available(days_idx, hour_idx){
+                                            let etat = time_slot.get_available().clone(); // Clone l'état avant
+                                            
+                                            if response_hours.clicked() {
+                                                teacher.set_availability(days_idx, hour_idx); 
+                                            }
+                                            
+                                            let (bg_color, text_color, text) = match etat {
+                                                Etat::Indisponible => (Color32::from_rgb(125, 8, 8), Color32::WHITE, "Indisponible"),
+                                                Etat::Disponible => (Color32::from_rgb(81, 121, 53), Color32::WHITE, "Disponible"),
+                                                Etat::Preference => (Color32::from_rgb(53, 77, 121), Color32::WHITE, "Preference"),
+
+                                            };
+
+                                            //let creneau = self.horaires.get(&(days_idx,hour_idx)).unwrap();                                      
+                                            let response =  ui.add(Button::new(egui::RichText::new(text).color(text_color))
+                                                                                    .fill(bg_color) // Change la couleur de fond
+                                                                                    .min_size(Vec2::new(100.0,50.0))
+                                                                                    .sense(egui::Sense::click())
+                                                                                    .frame(false)
+                                                                            );
+
+                                            if response.clicked() {
+                                                teacher.update(days_idx, hour_idx);
+                                            }
+                                            
+                                        }else{
+                                            let bg_color = Color32::TRANSPARENT;
+                                            let _response =  ui.add(Button::new(egui::RichText::new(" "))
+                                                                                    .fill(bg_color) // Change la couleur de fond
+                                                                                    .min_size(Vec2::new(100.0,50.0))
+                                                                                    .frame(false)
+                                                                            );
+                                        }
+                                    }
+                                    ui.label(" ");
+                                    ui.end_row();
+                                }
+                            });
+                        }
                     }
                 }
             });

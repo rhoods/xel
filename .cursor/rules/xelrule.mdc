@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+---
+
+# Your rule content:
+{
+  "rules": [
+    {
+      "description": "Le projet est un générateur de planning automatique pour les écoles.",
+      "enforcement": "Les suggestions doivent être adaptées à la gestion d'emplois du temps, incluant les créneaux horaires, les enseignants et les salles.",
+      "example": "Utiliser des structures comme `HashMap` pour associer les professeurs aux créneaux horaires."
+    },
+    {
+      "description": "Toujours respecter les conventions Rust.",
+      "enforcement": "Vérifier que le code suit les recommandations de Rustfmt et Clippy.",
+      "example": "Éviter les variables non utilisées, privilégier `Option` et `Result` au lieu de `unwrap()`."
+    },
+    {
+      "description": "Respecter l'organisation des modules Rust.",
+      "enforcement": "S'assurer que les modules sont bien structurés et utilisent `mod` et `use` correctement.",
+      "example": "Placer les définitions dans `src/lib.rs` et `src/main.rs` selon le type de projet."
+    },
+    {
+      "description": "Éviter le code unsafe sauf si nécessaire.",
+      "enforcement": "Ne proposer du code `unsafe` que si absolument indispensable et bien justifié.",
+      "example": "Ne pas suggérer `unsafe {}` sans commentaire expliquant son utilité."
+    },
+    {
+      "description": "Favoriser les idiomes Rust modernes.",
+      "enforcement": "Encourager l'utilisation des traits, `async/await`, `?` pour la gestion des erreurs.",
+      "example": "Préférer `.map()` et `.and_then()` plutôt que des `match` excessifs."
+    },
+    {
+      "description": "Respecter les bonnes pratiques de documentation.",
+      "enforcement": "Proposer des commentaires `///` pour documenter les fonctions et modules.",
+      "example": "Utiliser `///` avec des exemples concrets et `//!` pour documenter des modules entiers."
+    }
+  ]
+}

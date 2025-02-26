@@ -6,3 +6,4 @@ pub mod classe;
 pub mod matiere;
 pub mod assignation;
 pub mod planning;
+pub mod horaire;
