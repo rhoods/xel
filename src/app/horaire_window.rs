@@ -94,10 +94,8 @@ impl HoraireWindow {
                     
                     let nb_jour = self.horaires.keys().map(|(id_jour,_id_heure)| { id_jour}).max();
                     let nb_heure = self.horaires.keys().map(|(_id_jour,id_heure)| { id_heure}).max();
-                    
 
                     if !nb_jour.is_none() && !nb_heure.is_none(){
-                        
                         
                         let mut liste_id_jours: Vec<usize> = vec![0; nb_jour.unwrap() + 1];
                         let mut liste_id_heures: Vec<usize> = vec![0; nb_heure.unwrap() + 1];

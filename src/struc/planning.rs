@@ -4,6 +4,8 @@ use std::sync::{Arc, Mutex};
 use crate::app::filiere_window::Classe;
 use crate::struc::teacher::Teacher;
 use crate::app::room_window::Room;
+
+use crate::struc::horaire::{TypeCreneau};
 use rand::Rng;
 
 #[derive(Clone, Debug)]
@@ -12,6 +14,7 @@ pub struct Creneaux {
     pub id_classe: Option<usize>, //Option<Arc<Classe>>,
     pub id_salle: Option<usize>,//Option<Room>,
     pub id_matiere: Option<usize>,//Option<Room>,
+    pub actif_ou_repas: Option<TypeCreneau>,
 }
 
 impl Creneaux{
@@ -21,7 +24,15 @@ impl Creneaux{
             id_classe: None,
             id_salle: None,
             id_matiere: None,
+            actif_ou_repas: None,
         }
+    }
+
+    pub fn get_actif_ou_repas(&self) -> &Option<TypeCreneau>{ //&Option<Teacher>{
+        &self.actif_ou_repas
+    }
+    pub fn set_actif_ou_repas(&mut self, actif_ou_repas: TypeCreneau){ //&Option<Teacher>{
+        self.actif_ou_repas = Some(actif_ou_repas);
     }
 
     pub fn get_prof(&self) -> &Option<usize>{ //&Option<Teacher>{
@@ -80,41 +91,69 @@ impl Planning {
             planning : HashMap::new(),
         }
     }
-    pub fn init_planning(&mut self, nb_jour: usize, nb_heure: usize, ){
+    pub fn get_planning(&self) -> &HashMap<(usize,usize), Creneaux> {
+        &self.planning
+    }
+    
+    pub fn init_planning(&mut self, id_jour: usize, id_heure: usize, actif_ou_repas: TypeCreneau){
         //let mut planning: HashMap<(usize,usize), Creneaux>;
-        for nb_j in 0..nb_jour {
-            for nb_h in 0..nb_heure{
-                self.planning.insert((nb_j, nb_h), Creneaux::new());
-            }
-        } 
+        //for nb_j in 0..nb_jour {
+        //    for nb_h in 0..nb_heure{
+                self.planning.insert((id_jour, id_heure), Creneaux::new());
+                let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();
+                creneaux.actif_ou_repas = Some(actif_ou_repas);
+                if id_jour == 2 && id_heure > 4{
+                    println!("ne devrait pas etre généré");
+                }
+       //     }
+       // } 
     }
 
     pub fn get_creneau(&self, id_jour: usize, id_heure: usize,) -> Option<&Creneaux> {
         self.planning.get(&(id_jour, id_heure))
     }
+    
     pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_salle: usize, id_matiere: usize) {
         let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();   
         creneaux.id_classe =  Some(id_classe);
         creneaux.id_prof =  Some(id_prof);
         creneaux.id_salle =  Some(id_salle);
         creneaux.id_matiere =  Some(id_matiere);
-
     }
 
-    pub fn get_verif_random_creneau(&self,) -> (usize,usize,bool) {
+    pub fn reset_creneau(&mut self, id_jour: usize, id_heure: usize) {
+        let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();   
+        creneaux.id_classe =  None;
+        creneaux.id_prof =  None;
+        creneaux.id_salle =  None;
+        creneaux.id_matiere =  None;
+    }
+
+    pub fn get_verif_random_creneau(&self) -> (usize,usize,bool) {
         let mut rng = rand::thread_rng();
-        let jour = rng.gen_range(0..self.nb_jour);
-        let heure = rng.gen_range(0..self.nb_heure);
-        let creneau = self.planning.get(&(jour, heure));
+        //let jour = rng.gen_range(0..self.nb_jour);
+        //let heure = rng.gen_range(0..self.nb_heure);
+
+        let mut vec_planning: Vec<(usize,usize, bool)> = Vec::new();
+        for ((jour,heure), creneau) in self.planning.iter()
+            .filter(|((_jour,_heure), creneau)| {creneau.get_prof().is_none()})
+        {
+            vec_planning.push((*jour, *heure, true));
+        }
+
+        let id = rng.gen_range(0..vec_planning.len()); 
+        vec_planning[id]
+        //let creneau = self.planning.get(&(jour, heure));
         //dbg!(&creneau);
-        match creneau {
+        /*match creneau {
             Some(cre) => if let Some(_) = cre.get_prof() { 
                                         (jour, heure, false)
                                     } else { 
                                         (jour, heure, true)
+
                                     },
             None => (jour, heure, false)
-        }
+        }*/
 
     }
 

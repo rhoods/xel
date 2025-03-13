@@ -361,6 +361,7 @@ impl  SchedulerApp {
             self.semaines = self.programme_window.get_liste_semaine().clone();
             self.matieres_prog = self.programme_window.get_liste_matiere_prog().clone();
             self.groupe = self.programme_window.get_groupe().clone();
+            //dbg!(&self.groupe);
     }
 
     fn show_assignments_window(&mut self, ctx: &Context) {
@@ -373,7 +374,7 @@ impl  SchedulerApp {
     } //AssignationWindow
 
     fn show_generations_window(&mut self, ctx: &Context){
-        self.planning_window.charge(self.rooms.clone(), self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone());
+        self.planning_window.charge(self.rooms.clone(), self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone(), self.horaires.clone());
         self.planning_window.build(ctx);
     }
 

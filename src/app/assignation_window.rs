@@ -217,7 +217,7 @@ impl AssignationWindow {
                                                     //for i in 0..nb_groupe {
                                                     for (id, groupe) in self.groupe.iter().filter(|(id,groupe)|{ groupe.get_classe().get_id() == self.selected_classe_id.unwrap() && groupe.get_matiere().get_id() == matiere_prog.get_matiere().get_id()}){
 
-                                                        //let select = match self.selected_option.get(&(self.selected_classe_id.unwrap(),f_i)){
+                                                        //  let select = match self.selected_option.get(&(self.selected_classe_id.unwrap(),f_i)){
                                                         let mut select = match self.selected_option.get(&(self.selected_classe_id.unwrap(),*matiere_prog.get_matiere().get_id(), *id)){
                                                             
                                                             Some(sel) => {sel.clone()},
