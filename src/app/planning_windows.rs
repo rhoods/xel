@@ -11,7 +11,7 @@ use rusqlite::{params, Connection, Result};
 use std::collections::{HashMap, HashSet};
 use crate::struc::matiere::Matiere;
 use crate::struc::planning::{Planning, Creneaux, enum_type_id};
-use crate::struc::teacher::{Teacher};
+use crate::struc::teacher::{Teacher, Etat};
 use crate::struc::assignation::{self, Assignation, Groupe};
 use crate::struc::programme::{MatiereProg, Semaine, MatiereInterClasse}; 
 use crate::app::filiere_window::{Filiere, Classe};
@@ -110,10 +110,10 @@ impl PlanningWindow {
                             self.create_planning();
                             count += 1;
                         }
-                        dbg!(&self.generation_reussi);
                         dbg!(&self.liste_creneau_non_placer);
                         if self.generation_reussi{
                             print!("Mission Reussi!");
+                            dbg!(&count);
                             self.generation_reussi = false;
                         }
                         else{
@@ -252,24 +252,32 @@ impl PlanningWindow {
     }
     
     
+
+
     pub fn init_planning(&mut self){
         for (id_prof, _prof) in self.teachers.iter(){
             for num_sem in 0..self.nb_semaine_max {
                 //dbg!(id_prof);
                 //dbg!(num_sem);
+                let teacher_schedule = self.teachers.get(id_prof).unwrap().schedule.clone() ;
+                let mut etat: Etat;
                 self.planning_prof.insert((*id_prof, num_sem), Planning::new(enum_type_id::id_prof, *id_prof,num_sem,5,8));
                 let planning = self.planning_prof.get_mut(&(*id_prof, num_sem)).unwrap();
                 //dbg!(&planning);
                 for ((id_jour, id_heure), creneau) in self.horaires.iter()
                 //.filter(|((id_jour, id_heure), creneau)| { creneau.get_dispo() != TypeCreneau::Desactive })
                 {
+                    //dbg!((&id_prof, id_jour, id_heure));
+                    match teacher_schedule.get(&(*id_jour, *id_heure)){
+                        Some(creneau) => etat = creneau.etat,
+                        None => etat = Etat::Indisponible,
+                    };
                     let actif_ou_repas = creneau.get_dispo();
-                    if actif_ou_repas == TypeCreneau::Actif{
-                        planning.init_planning(*id_jour, *id_heure, actif_ou_repas);
-                    }
                     
+                    if actif_ou_repas == TypeCreneau::Actif{
+                        planning.init_planning(*id_jour, *id_heure, actif_ou_repas, etat);
+                    }
                 }
-                //dbg!(&planning);
             }
         }
         for (id_classe, _classe) in self.classe.iter(){
@@ -281,7 +289,7 @@ impl PlanningWindow {
                 {
                     let actif_ou_repas = creneau.get_dispo();
                     if actif_ou_repas == TypeCreneau::Actif{
-                        planning.init_planning(*id_jour, *id_heure, actif_ou_repas);
+                        planning.init_planning(*id_jour, *id_heure, actif_ou_repas, Etat::Disponible);
                     }
                 }
             }
@@ -296,7 +304,7 @@ impl PlanningWindow {
                 {
                     let actif_ou_repas = creneau.get_dispo();
                     if actif_ou_repas == TypeCreneau::Actif{
-                        planning.init_planning(*id_jour, *id_heure, actif_ou_repas);
+                        planning.init_planning(*id_jour, *id_heure, actif_ou_repas, Etat::Disponible);
                     }
                 }
             }
@@ -305,11 +313,12 @@ impl PlanningWindow {
 
 
 
-
-
-    pub fn alim_creneau_a_placer(&mut self){
+    pub fn alim_creneau_a_placer_en_groupe(&mut self){
         //construction de la liste des creneaux à placer ( liste des matieres par classe et le nombre d'heure de chacune)
-        self.liste_creneau_non_placer = HashMap::new();
+        //self.liste_creneau_non_placer = HashMap::new();
+        //self.liste_creneau_placer = HashMap::new();
+        
+        self.liste_creneau_a_placer = HashMap::new();
         for (_id, assignation) in self.assignement.iter(){
             let id_filiere = assignation.get_classe().get_filiere().get_id();
             let id_matiere = assignation.get_matiere().get_id();
@@ -320,7 +329,79 @@ impl PlanningWindow {
             for (_id_mat_prog, matiere_prog) in self.matiere_prog.iter()
                                                                     .filter(|(_id_s, mat_prog)| 
                                                                         {mat_prog.get_semaine().get_filiere().get_id() ==id_filiere 
+                                                                        && mat_prog.get_matiere().get_id() == id_matiere
+                                                                        && *mat_prog.get_en_groupe()})
+            {
+                let id_semaine = *matiere_prog.get_semaine().get_id();
+                self.liste_creneau_a_placer.insert((id_classe,id_prof, *id_matiere, *id_groupe, id_semaine),(*matiere_prog.get_nb_heure(),*matiere_prog.get_duree_minimum(),*matiere_prog.get_duree_maximum()));
+            }
+        }
+
+        
+    }
+
+    pub fn liste_semaines(&self) -> HashSet<usize> {
+        
+        let mut liste_semaine: HashSet<usize> = HashSet::new();
+        for (_id, assignation) in self.assignement.iter(){
+            let id_filiere = assignation.get_classe().get_filiere().get_id();
+            let id_matiere = assignation.get_matiere().get_id();
+            for (_id_mat_prog, matiere_prog) in self.matiere_prog.iter()
+                                                                    .filter(|(_id_s, mat_prog)| 
+                                                                        {mat_prog.get_semaine().get_filiere().get_id() ==id_filiere 
                                                                         && mat_prog.get_matiere().get_id() == id_matiere})
+            {
+                let id_semaine = *matiere_prog.get_semaine().get_id();
+                liste_semaine.insert(id_semaine);  
+            }   
+        }
+        liste_semaine                                                             
+    }
+
+
+    pub fn filtrage_cours_non_recurent(&mut self, liste_semaine: HashSet<usize>){
+
+        for (_id, assignation) in self.assignement.iter(){
+            let id_filiere = assignation.get_classe().get_filiere().get_id();
+            let id_matiere = assignation.get_matiere().get_id();
+            let id_classe = assignation.get_classe().get_id();
+            let id_groupe = assignation.get_groupe().get_id();
+            let id_prof = assignation.get_prof().get_id();
+            
+            let mut a_filtrer = false;
+            for semaine in liste_semaine.iter(){
+                if self.liste_creneau_a_placer.get(&(id_classe,id_prof, *id_matiere, *id_groupe, *semaine)).is_none(){
+                    a_filtrer = true;
+                }
+            }
+            if a_filtrer {
+                for semaine in liste_semaine.iter(){
+                    self.liste_creneau_a_placer.remove(&(id_classe,id_prof, *id_matiere, *id_groupe, *semaine));
+                }
+            }
+        }
+
+    }
+   
+
+    pub fn alim_creneau_a_placer(&mut self){
+        //construction de la liste des creneaux à placer ( liste des matieres par classe et le nombre d'heure de chacune)
+        //self.liste_creneau_non_placer = HashMap::new();
+        //self.liste_creneau_placer = HashMap::new();
+        self.liste_creneau_a_placer = HashMap::new();
+        for (_id, assignation) in self.assignement.iter(){
+            let id_filiere = assignation.get_classe().get_filiere().get_id();
+            let id_matiere = assignation.get_matiere().get_id();
+            let id_classe = assignation.get_classe().get_id();
+            let id_groupe = assignation.get_groupe().get_id();
+            let id_prof = assignation.get_prof().get_id();
+
+            for (_id_mat_prog, matiere_prog) in self.matiere_prog.iter()
+                                                                    .filter(|(_id_s, mat_prog)| 
+                                                                        {mat_prog.get_semaine().get_filiere().get_id() ==id_filiere 
+                                                                        && mat_prog.get_matiere().get_id() == id_matiere
+                                                                        && !*mat_prog.get_en_groupe()
+                                                                    })
             {
                 let id_semaine = *matiere_prog.get_semaine().get_id();
                 self.liste_creneau_a_placer.insert((id_classe,id_prof, *id_matiere, *id_groupe, id_semaine),(*matiere_prog.get_nb_heure(),*matiere_prog.get_duree_minimum(),*matiere_prog.get_duree_maximum()));
@@ -331,96 +412,58 @@ impl PlanningWindow {
 
 
 
-
-
-//-> (usize,usize,bool) --> devient (usize,usize,usize,bool) pour ajouter la durée?
-    pub fn trouve_creneau_dispo_prof(&self, id_prof: &usize, id_semaine: &usize, nb_heure_restant: &usize, duree_min: &usize, duree_max: &usize) -> (usize, usize, usize, bool){
-        let mut new_duree_max = 0;
-        let mut dispo = false;
-        let mut nb_essai: usize = 0;
-        //let mut longueur_creneau = *duree_max;
-        //let mut nb_essai: usize = 0;
-        let mut creneau_dispo: (usize,usize,bool) = (0,0,false);
-        while nb_essai < 400 {
-            creneau_dispo  = self.trouve_creneau_alea_dispo_prof(id_prof, id_semaine);
-            if creneau_dispo.2 {
-                new_duree_max = 1;
-                dispo = true;
-                break;
-            }
-            nb_essai += 1;
-        }
-
-        if creneau_dispo.2 {
-            new_duree_max = *duree_max;
-            while self.trouve_longueur_creneau_max(id_prof, id_semaine, creneau_dispo.0,creneau_dispo.1 , &new_duree_max) <  *duree_min && new_duree_max > *duree_min{
-                new_duree_max -= *duree_min;  
-            };
-        }
-        (creneau_dispo.0, creneau_dispo.1, new_duree_max, dispo ) //jour, heure, durée
-    }
-    
-
-
-
-
-    pub fn trouve_longueur_creneau_max(&self, id_prof: &usize, id_semaine: &usize, jour:usize , heure:usize , duree_max: &usize) -> usize{
-        let mut i_max =  *duree_max;
-        let mut ok: bool  = true;
-        //let mut i_min =  *duree_min;
-        let mut creneau_dispo = (jour,heure, true);
-        for i in 1..i_max{
-            match self.planning_prof.get(&(*id_prof, *id_semaine)){
-                Some(planning) => {
-                                               creneau_dispo = planning.get_verif_creneau(jour, heure + i);
-                                                if !creneau_dispo.2 {
-                                                    ok = false;
-                                                    break;
-                                                }
-                                            },
-                None => {ok = false; break;},
-            };
-        }
-
-        match ok {
-            true => i_max,
-            false => 1
-        }
-    }
-
-
-    pub fn trouve_creneau_alea_dispo_prof(&self, id_prof: &usize, id_semaine: &usize) -> (usize,usize,bool){
-        match self.planning_prof.get(&(*id_prof, *id_semaine)){
-            Some(planning) => planning.get_verif_random_creneau(),
-            None => (0,0,false),
-        }
-    }
-
-    
-
     pub fn create_planning(&mut self) {
-
+        let liste_semaine: HashSet<usize>;
         self.alim_nb_semaine_max();
+        liste_semaine = self.liste_semaines();
         self.init_planning();
+        
+        //on place d'abord les cours en groupe qui reviennent chaque semaine
+        self.alim_creneau_a_placer_en_groupe();  // --> diviser en groupe avec le meme prof et groupe profs différents
+        self.filtrage_cours_non_recurent(liste_semaine.clone());
+        self.place_les_creneaux(); //-> modifier la recherche de la durée du creneau si le prof est le même pour chaque groupe
+                                    // --> modifier la recherche des creneaux disponibles si les profs sont différents pour chaque groupe
+        //on place d'abord les cours restant en groupe et non en groupe qui reviennent chaque semaine
         self.alim_creneau_a_placer();
+        self.filtrage_cours_non_recurent(liste_semaine.clone());
+        self.place_les_creneaux();
+
+        //on place d'abord les cours en groupe qui ne reviennent pas chaque semaine
+        self.alim_creneau_a_placer_en_groupe();
+        self.place_les_creneaux();
+
+        //on place d'abord les cours restant en groupe et non en groupe qui ne reviennent pas chaque semaine
+        self.alim_creneau_a_placer();
+        self.filtrage_cours_non_recurent(liste_semaine.clone());
+        self.place_les_creneaux();
         //debut placement des creneaux
-        let mut id_type_salle: usize;
+        
+        //let mut id_type_salle: usize;
 
         self.generation_reussi = true;
 
         
-        let mut rng_1 = thread_rng();
-        let mut keys_a_placer: Vec<_> = self.liste_creneau_a_placer.iter().collect();
-        keys_a_placer.shuffle(&mut rng_1);
-                       
 
+    }
+
+    pub fn place_les_creneaux(&mut self){
+
+        let mut id_type_salle: usize;
+        
+        let mut rng_1 = thread_rng();
+        let mut keys_a_placer: Vec<_> = self.liste_creneau_a_placer.iter()
+                                        .filter(|((id_classe, id_prof, id_matiere, id_groupe, id_semaine), _ )| 
+                                            { self.liste_creneau_placer.get(&(*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine)).is_none()}
+                                        )
+                                        .collect();
+        keys_a_placer.shuffle(&mut rng_1);
                         
         //for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), (nb_heure, duree_min, duree_max)) in self.liste_creneau_a_placer.iter(){
         for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), (nb_heure, duree_min, duree_max)) in keys_a_placer{
              
             let mut nb_heure_restant = *nb_heure;
             let mut nb_max_passage = 0;
-            let mut creneau_dispo: (usize,usize,usize,bool) = (1,1,1,false); 
+             let mut creneau_dispo:(usize,usize,usize,bool) = (1,1,1,false);
             let mut creneau_dispo_salle: (usize,usize,bool) = (0,0,false); 
             let mut id_salle: usize = 0;
             
@@ -433,83 +476,21 @@ impl PlanningWindow {
 
             while nb_heure_restant > 0 {
                 //dbg!(&nb_max_passage);
-                if nb_max_passage > 40000 {
+                if nb_max_passage > 4000 {
                     self.generation_reussi = false;
                     self.liste_creneau_non_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), nb_heure_restant);   
                     break;
                 }
+                //trouve un creneau disponible pour le prof et la classe
+                creneau_dispo = self.trouve_creneau_dispo( *id_semaine, *id_prof,  *id_classe, *duree_min, *duree_max, &nb_heure_restant);
+                
+                //verification qu'une salle est disponible
+                let id_salle: usize;
+                let dispo_salle: bool;
+                (id_salle, dispo_salle) = self.get_dispo_salle(&creneau_dispo, &id_type_salle, &id_semaine);
+                
 
-                if let Some(planning_prof) = self.planning_prof.get(&(*id_prof, *id_semaine)){
-                    if let Some(planning_classe) = self.planning_classe.get(&(*id_classe, *id_semaine)){
-                        let mut creneau_trouve = false;
-
-                        let mut rng = thread_rng();
-                        let mut keys: Vec<_> = planning_prof.get_planning().keys().collect();
-                        keys.shuffle(&mut rng);
-                       
-
-                        //for ((jour, heure), _creneau_prof) in planning_prof.get_planning().iter() {
-                        for    (jour, heure) in  keys{
-                            creneau_dispo = (1,1,1,false);
-                            
-                            let mut new_duree_max: usize;
-                            if nb_heure_restant > *duree_max{
-                                new_duree_max = *duree_max;
-                            }else{
-                                new_duree_max = nb_heure_restant;
-                            }
-
-                            while new_duree_max >= *duree_min {
-
-                                for i in 0..new_duree_max { 
-                                    creneau_trouve = false;
-                                    if let Some(new_creneau_prof) = planning_prof.get_creneau(*jour,*heure + i){
-                                        if let Some(creneau_classe) = planning_classe.get_creneau(*jour,*heure + i){
-                                            if new_creneau_prof.get_prof().is_none() && creneau_classe.get_prof().is_none() {
-                                                creneau_trouve = true;
-                                            }      
-                                        }   
-                                    }
-                                    if !creneau_trouve {
-                                        new_duree_max -= *duree_min;
-                                        break;
-                                    }
-                                }
-
-                                if creneau_trouve {
-                                    creneau_dispo = (*jour, *heure, new_duree_max, true);
-                                    break;
-                                }else if new_duree_max == *duree_min{
-                                    nb_max_passage += 1;
-                                    break;
-                                }
-                            }
-                            //on sort de la boucle for
-                            if creneau_dispo.3 {
-                                break;
-                            }
-                        }
-
-                    }
-                }
-
-                if creneau_dispo.3 {
-                    for (id_room, _room) in self.salle.iter().filter(|(_id, room)|{room.get_room_type().get_id() == id_type_salle}){
-                        if !creneau_dispo_salle.2{
-                            for i in 0..creneau_dispo.2 {
-                                match self.planning_room.get(&(*id_room, id_type_salle, *id_semaine)) {
-                                    Some(planning_room) => {
-                                                                        id_salle = *id_room;   
-                                                                        creneau_dispo_salle = planning_room.get_verif_creneau(creneau_dispo.0, creneau_dispo.1 + i);
-                                                                    },
-                                    None => continue,
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if !creneau_dispo_salle.2 {
+                if !dispo_salle {
                     nb_max_passage += 1;
                     continue;
                 }else{
@@ -524,8 +505,10 @@ impl PlanningWindow {
                         planning_salle.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
                     }   
                     nb_heure_restant -= creneau_dispo.2; //duree du creneau
-                    self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), *nb_heure);   
-                    
+                    if nb_heure_restant == 0 {
+
+                        self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), *nb_heure);   
+                    }
                 }
               
                 //si plus d'heure de repas dispo, alors on annule les inserts
@@ -549,7 +532,95 @@ impl PlanningWindow {
    
             }      
         }
+
+
     }
+    pub fn get_dispo_salle(&self, creneau_dispo: &(usize,usize,usize,bool), id_type_salle:&usize, id_semaine: &usize) -> (usize,bool) {
+        let mut creneau_dispo_salle: (usize,usize,bool) = (creneau_dispo.0, creneau_dispo.1, false);  
+        let mut id_salle: usize = 0;
+        for (id_room, _room) in self.salle.iter().filter(|(_id, room)|{room.get_room_type().get_id() == *id_type_salle}){
+            if !creneau_dispo_salle.2{
+                for i in 0..creneau_dispo.2 {
+                    match self.planning_room.get(&(*id_room, *id_type_salle, *id_semaine)) {
+                        Some(planning_room) => {
+                                                            id_salle = *id_room;   
+                                                            creneau_dispo_salle = planning_room.get_verif_creneau(creneau_dispo.0, creneau_dispo.1 + i);
+                                                        },
+                        None => continue,
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+        (id_salle,creneau_dispo_salle.2)
+    }
+
+
+    pub fn trouve_duree_creneau(&self, duree_max: usize, duree_min: usize, planning_prof: &Planning,  planning_classe: &Planning, jour: &usize, heure: &usize ) -> (usize,usize,usize,bool) {
+        let mut creneau_trouve: bool = false;
+        let mut creneau_dispo = (1,1,1,false);
+        let mut new_duree_max = duree_max.clone();
+        while new_duree_max >= duree_min {
+            for i in 0..new_duree_max { 
+                creneau_trouve = false;
+                if let Some(new_creneau_prof) = planning_prof.get_creneau(*jour,*heure + i){
+                    if let Some(creneau_classe) = planning_classe.get_creneau(*jour,*heure + i){
+                        if new_creneau_prof.get_prof().is_none() && creneau_classe.get_prof().is_none() {
+                            creneau_trouve = true;
+                        }      
+                    }   
+                }
+                if !creneau_trouve {
+                    new_duree_max -= duree_min;
+                    break;
+                }
+            }
+
+            if creneau_trouve {
+                creneau_dispo = (*jour, *heure, new_duree_max, true);
+                break;
+            }else if duree_max == duree_min{
+                break;
+            }
+        }
+        creneau_dispo
+        
+    }
+
+
+    pub fn trouve_creneau_dispo(&self, id_semaine: usize, id_prof: usize,  id_classe: usize, duree_min:usize, duree_max:usize, nb_heure_restant:&usize) -> (usize,usize,usize,bool){
+        let mut creneau_dispo: (usize,usize,usize,bool) = (1,1,1,false);
+
+        if let Some(planning_prof) = self.planning_prof.get(&(id_prof, id_semaine)){
+            if let Some(planning_classe) = self.planning_classe.get(&(id_classe, id_semaine)){
+                //let mut creneau_trouve = false;
+
+                let mut rng = thread_rng();
+                let mut keys: Vec<_> = planning_prof.get_planning().keys().collect();
+                keys.shuffle(&mut rng);
+                
+                for (jour, heure) in  keys{
+                    //creneau_dispo = (1,1,1,false);
+                    let new_duree_max: usize;
+                    if nb_heure_restant > &duree_max{
+                        new_duree_max = duree_max;
+                    }else{
+                        new_duree_max = *nb_heure_restant;
+                    }
+
+                    creneau_dispo = self.trouve_duree_creneau(new_duree_max, duree_min, planning_prof,  planning_classe, jour, heure);
+                    //on sort de la boucle for
+                    if creneau_dispo.3 {
+                        break;
+                    }
+                }
+
+            }
+        }
+        creneau_dispo
+    }
+
 
     //verifie que une des heures de repas est disponible
     pub fn get_dispo_repas(&self, id: usize, id_semaine: usize, jour_creneau: usize/*, dispo_ou_repas: TypeCreneau*/) -> bool{
@@ -576,7 +647,7 @@ impl PlanningWindow {
     }
 
     //compte le nombre de creneaux non placés pour la partie fitness
-    pub fn get_nb_creneau_restant(&self) -> usize {
+    /*pub fn get_nb_creneau_restant(&self) -> usize {
         let mut count: usize = 0;
         for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), (nb_heure, _duree_mini, _duree_max)) in self.liste_creneau_a_placer.iter(){
             match self.liste_creneau_placer.get(&(*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine)){
@@ -585,6 +656,6 @@ impl PlanningWindow {
             }
         }
         count
-    }
+    }*/
 
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use std::sync::{Arc, Mutex};
 use crate::app::filiere_window::Classe;
-use crate::struc::teacher::Teacher;
+use crate::struc::teacher::{Teacher, Etat};
 use crate::app::room_window::Room;
 
 use crate::struc::horaire::{TypeCreneau};
@@ -15,6 +15,7 @@ pub struct Creneaux {
     pub id_salle: Option<usize>,//Option<Room>,
     pub id_matiere: Option<usize>,//Option<Room>,
     pub actif_ou_repas: Option<TypeCreneau>,
+    pub preference: Option<Etat>,
 }
 
 impl Creneaux{
@@ -25,6 +26,7 @@ impl Creneaux{
             id_salle: None,
             id_matiere: None,
             actif_ou_repas: None,
+            preference: None,
         }
     }
 
@@ -33,6 +35,13 @@ impl Creneaux{
     }
     pub fn set_actif_ou_repas(&mut self, actif_ou_repas: TypeCreneau){ //&Option<Teacher>{
         self.actif_ou_repas = Some(actif_ou_repas);
+    }
+
+    pub fn get_preference(&self) -> &Option<Etat>{ //&Option<Teacher>{
+        &self.preference
+    }
+    pub fn set_preference(&mut self, preference: Etat){ //&Option<Teacher>{
+        self.preference = Some(preference);
     }
 
     pub fn get_prof(&self) -> &Option<usize>{ //&Option<Teacher>{
@@ -94,14 +103,15 @@ impl Planning {
     pub fn get_planning(&self) -> &HashMap<(usize,usize), Creneaux> {
         &self.planning
     }
-    
-    pub fn init_planning(&mut self, id_jour: usize, id_heure: usize, actif_ou_repas: TypeCreneau){
+
+    pub fn init_planning(&mut self, id_jour: usize, id_heure: usize, actif_ou_repas: TypeCreneau, etat: Etat){
         //let mut planning: HashMap<(usize,usize), Creneaux>;
         //for nb_j in 0..nb_jour {
         //    for nb_h in 0..nb_heure{
                 self.planning.insert((id_jour, id_heure), Creneaux::new());
                 let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();
                 creneaux.actif_ou_repas = Some(actif_ou_repas);
+                creneaux.preference = Some(etat);
                 if id_jour == 2 && id_heure > 4{
                     println!("ne devrait pas etre généré");
                 }
