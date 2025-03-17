@@ -434,7 +434,7 @@ impl  SchedulerApp {
         //let mut insert_programme = conn.prepare("INSERT INTO Programme (id, nb_semaine, id_filiere) VALUES (?1, ?2, ?3)")?;
         let mut insert_semaine = conn.prepare("INSERT INTO Semaine (id_semaine, id_filiere) VALUES (?1, ?2)")?;
         let mut insert_matiere_prog = conn.prepare("INSERT INTO MatiereProg (id, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)")?;
-        let mut insert_en_groupe_inter_classe = conn.prepare("INSERT INTO MatiereInterClasse (id, id_matiere_prog, id_classe) VALUES (?1, ?2, ?3)")?;
+        let mut insert_en_groupe_inter_classe = conn.prepare("INSERT INTO MatiereInterClasse (id, id_matiere, id_classe) VALUES (?1, ?2, ?3)")?;
         let mut insert_groupe = conn.prepare("INSERT INTO Groupe (id, id_matiere,id_classe) values (?1, ?2, ?3)")?;
         let mut insert_assignement = conn.prepare("INSERT INTO Assignement (id, id_classe, id_matiere, id_prof, id_groupe) values (?1, ?2, ?3, ?4, ?5)")?;
         /*for (cle, programme) in self.programmes.iter() {
@@ -449,9 +449,7 @@ impl  SchedulerApp {
         }
         // selected_liste_classe: HashMap<(usize,usize,usize), Arc<Classe>>, //(id_classe,id_matiere_prog i), id_classe  
         
-        for ((id_classe, id_matiere_prog, id), classe) in self.selected_liste_inter_classe.iter(){
-            insert_en_groupe_inter_classe.execute(rusqlite::params![id, id_matiere_prog, id_classe])?;
-        }
+        
 
         //dbg!(&self.groupe);
         for (cle_groupe, groupe) in self.groupe.iter(){
@@ -460,6 +458,11 @@ impl  SchedulerApp {
 
         for (cle_assignement, assignement) in self.assignement.iter(){
             insert_assignement.execute(rusqlite::params![cle_assignement, assignement.get_classe().get_id(), assignement.get_matiere().get_id(), assignement.get_prof().get_id(), assignement.get_groupe().get_id()])?;
+        }
+        //modification à faire sur la saisie et le stockage des cours interclasse
+        //
+        for ((id_classe, id_matiere, id), classe) in self.selected_liste_inter_classe.iter(){
+            insert_en_groupe_inter_classe.execute(rusqlite::params![id, id_matiere, id_classe])?;
         }
 
         Ok(())
@@ -641,12 +644,12 @@ impl  SchedulerApp {
             };
         }
 
-        let mut recup_matiere_inter_classe = conn.prepare("SELECT id, id_matiere_prog, id_classe FROM MatiereInterClasse")?;
+        let mut recup_matiere_inter_classe = conn.prepare("SELECT id, id_matiere, id_classe FROM MatiereInterClasse")?;
         let rows = recup_matiere_inter_classe.query_map([], |row| {
             let id_matiere_inter_classe: usize = row.get(0)?;
-            let id_matiere_prog: usize = row.get(1)?;
+            let id_matiere: usize = row.get(1)?;
             let id_classe: usize = row.get(2)?;
-            Ok((id_matiere_inter_classe, id_matiere_prog, id_classe))
+            Ok((id_matiere_inter_classe, id_matiere, id_classe))
         })?;
 
         for row in rows {

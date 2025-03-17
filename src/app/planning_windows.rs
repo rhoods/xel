@@ -317,7 +317,10 @@ impl PlanningWindow {
         //construction de la liste des creneaux à placer ( liste des matieres par classe et le nombre d'heure de chacune)
         //self.liste_creneau_non_placer = HashMap::new();
         //self.liste_creneau_placer = HashMap::new();
-        
+        let mut liste_prof: HashMap<(usize,usize), HashSet<usize>> = HashMap::new();
+        let mut liste_groupe: HashMap<(usize,usize), HashSet<usize>> = HashMap::new();
+        let mut liste_classe: HashMap<(usize,usize), HashSet<usize>> = HashMap::new();
+
         self.liste_creneau_a_placer = HashMap::new();
         for (_id, assignation) in self.assignement.iter(){
             let id_filiere = assignation.get_classe().get_filiere().get_id();
@@ -326,15 +329,65 @@ impl PlanningWindow {
             let id_groupe = assignation.get_groupe().get_id();
             let id_prof = assignation.get_prof().get_id();
 
+            match liste_prof.get_mut(&(id_classe,*id_matiere)){
+                Some(profs) => 
+                        {   
+                            profs.insert(id_prof);
+                        },
+                None => {
+                            let mut profs = HashSet::new();
+                            profs.insert(id_prof);
+                            liste_prof.insert((id_classe, *id_matiere), profs);
+                        },
+            };
+
+            match liste_groupe.get_mut(&(id_classe,*id_matiere)){
+                Some(groupes) => 
+                        {   
+                            groupes.insert(*id_groupe);
+                        },
+                None => {
+                            let mut groupes = HashSet::new();
+                            groupes.insert(*id_groupe);
+                            liste_prof.insert((id_classe, *id_matiere), groupes);
+                        },
+            };
+
+            
+
+                /*
+                pub struct MatiereInterClasse  {
+                    id:usize,
+                    matiere_prog:  Arc<MatiereProg>, //mettre le meme id pour matiere et nb_heure
+                    classe: Arc<Classe>
+                }
+                    */
+            
             for (_id_mat_prog, matiere_prog) in self.matiere_prog.iter()
-                                                                    .filter(|(_id_s, mat_prog)| 
-                                                                        {mat_prog.get_semaine().get_filiere().get_id() ==id_filiere 
-                                                                        && mat_prog.get_matiere().get_id() == id_matiere
-                                                                        && *mat_prog.get_en_groupe()})
+            .filter(|(_id_s, mat_prog)| 
+                {
+                    mat_prog.get_semaine().get_filiere().get_id() == id_filiere 
+                    && mat_prog.get_matiere().get_id() == id_matiere
+                    && *mat_prog.get_en_groupe()
+                })
             {
                 let id_semaine = *matiere_prog.get_semaine().get_id();
+
+                match liste_classe.get_mut(&(id_classe,*id_matiere)){
+                    Some(classes) => 
+                            {   
+                                classes.insert(*id_groupe);
+                            },
+                    None => {
+                                let mut classes = HashSet::new();
+                                classes.insert(*id_groupe);
+                                liste_prof.insert((id_classe, *id_matiere), classes);
+                            },
+                };
+
                 self.liste_creneau_a_placer.insert((id_classe,id_prof, *id_matiere, *id_groupe, id_semaine),(*matiere_prog.get_nb_heure(),*matiere_prog.get_duree_minimum(),*matiere_prog.get_duree_maximum()));
             }
+
         }
 
         
@@ -356,6 +409,31 @@ impl PlanningWindow {
             }   
         }
         liste_semaine                                                             
+    }
+
+    pub fn liste_cours_en_groupe_prof_different(&self) ->  HashMap<(usize,usize), bool> {
+        let mut liste_cours_en_groupe_prof_different: HashMap<(usize,usize), bool> = HashMap::new();
+        let mut map_prof: HashMap<(usize,usize),usize> = HashMap::new();
+        
+        for (_id, assignation) in self.assignement.iter(){
+            //let id_filiere = assignation.get_classe().get_filiere().get_id();
+            let id_matiere = assignation.get_matiere().get_id();
+            let id_classe = assignation.get_classe().get_id();
+            //let id_groupe = assignation.get_groupe().get_id();
+            let id_prof = assignation.get_prof().get_id();
+
+            match map_prof.get(&(id_classe, *id_matiere)) {
+                Some(prof) => {
+                                        if *prof != id_prof {
+                                            liste_cours_en_groupe_prof_different.insert((id_classe, *id_matiere), true);
+                                        }
+                                      },
+                None => {
+                            map_prof.insert((id_classe, *id_matiere), id_prof);
+                        },
+            };
+        }
+        liste_cours_en_groupe_prof_different
     }
 
 
@@ -413,40 +491,51 @@ impl PlanningWindow {
 
 
     pub fn create_planning(&mut self) {
-        let liste_semaine: HashSet<usize>;
+        
+        self.liste_creneau_placer = HashMap::new();
+        self.liste_creneau_non_placer = HashMap::new();
+        let mut liste_semaine: HashSet<usize>;
         self.alim_nb_semaine_max();
         liste_semaine = self.liste_semaines();
         self.init_planning();
         
+        let mut liste_cours_en_groupe_prof_different: HashMap<(usize,usize), bool> = HashMap::new();
         //on place d'abord les cours en groupe qui reviennent chaque semaine
         self.alim_creneau_a_placer_en_groupe();  // --> diviser en groupe avec le meme prof et groupe profs différents
-        self.filtrage_cours_non_recurent(liste_semaine.clone());
-        self.place_les_creneaux(); //-> modifier la recherche de la durée du creneau si le prof est le même pour chaque groupe
+        self.filtrage_cours_non_recurent(liste_semaine.clone()); 
+        liste_cours_en_groupe_prof_different = self.liste_cours_en_groupe_prof_different();
+        dbg!(&liste_cours_en_groupe_prof_different);
+        self.place_les_creneaux(true, &mut liste_semaine, true, &liste_cours_en_groupe_prof_different); //-> modifier la recherche de la durée du creneau si le prof est le même pour chaque groupe
                                     // --> modifier la recherche des creneaux disponibles si les profs sont différents pour chaque groupe
+                                    // --> + cours récurent, donc dès qu'une occurrence est trouvée, la placer pour toutes les semaines et ne pas traiter les autres semaine dans la boucle
         //on place d'abord les cours restant en groupe et non en groupe qui reviennent chaque semaine
         self.alim_creneau_a_placer();
         self.filtrage_cours_non_recurent(liste_semaine.clone());
-        self.place_les_creneaux();
+        self.place_les_creneaux(true, &mut liste_semaine, false, &liste_cours_en_groupe_prof_different);
+
 
         //on place d'abord les cours en groupe qui ne reviennent pas chaque semaine
         self.alim_creneau_a_placer_en_groupe();
-        self.place_les_creneaux();
+        self.place_les_creneaux(false, &mut liste_semaine, true, &liste_cours_en_groupe_prof_different);
 
         //on place d'abord les cours restant en groupe et non en groupe qui ne reviennent pas chaque semaine
         self.alim_creneau_a_placer();
         self.filtrage_cours_non_recurent(liste_semaine.clone());
-        self.place_les_creneaux();
+        self.place_les_creneaux(false, &mut liste_semaine, false, &liste_cours_en_groupe_prof_different);
         //debut placement des creneaux
         
         //let mut id_type_salle: usize;
 
-        self.generation_reussi = true;
+        if self.liste_creneau_non_placer.len() == 0{
+            self.generation_reussi = true;
+        }
+        
 
         
 
     }
 
-    pub fn place_les_creneaux(&mut self){
+    pub fn place_les_creneaux(&mut self, recurrent: bool, liste_semaine: &mut HashSet<usize>, en_groupe: bool, liste_cours_en_groupe_prof_different: &HashMap<(usize,usize), bool>){
 
         let mut id_type_salle: usize;
         
@@ -458,9 +547,13 @@ impl PlanningWindow {
                                         .collect();
         keys_a_placer.shuffle(&mut rng_1);
                         
-        //for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), (nb_heure, duree_min, duree_max)) in self.liste_creneau_a_placer.iter(){
-        for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), (nb_heure, duree_min, duree_max)) in keys_a_placer{
-             
+        for ((id_classe, id_prof, id_matiere, id_groupe, id_semaine), (nb_heure, duree_min, duree_max)) in keys_a_placer
+        {
+            //si on est dans le cas ou on place les cours recurrent et que ce cours a deja etait placé pour une des semaines, alors on passe au prochain cours
+            if recurrent && !self.liste_creneau_placer.get(&(*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine)).is_none(){
+                continue;
+            }
+
             let mut nb_heure_restant = *nb_heure;
             let mut nb_max_passage = 0;
              let mut creneau_dispo:(usize,usize,usize,bool) = (1,1,1,false);
@@ -495,20 +588,28 @@ impl PlanningWindow {
                     continue;
                 }else{
                     //CRENEAU TROUVE
-                    let planning_prof = self.planning_prof.get_mut(&(*id_prof, *id_semaine)).unwrap();
-                    let planning_classe = self.planning_classe.get_mut(&(*id_classe, *id_semaine)).unwrap();
-                    let planning_salle = self.planning_room.get_mut(&(id_salle, id_type_salle, *id_semaine)).unwrap();
+                    nb_heure_restant -= creneau_dispo.2;
                     
-                    for i in 0..creneau_dispo.2 {
-                        planning_prof.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
-                        planning_classe.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
-                        planning_salle.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
+                    for semaine in liste_semaine.iter()
+                    .filter(|semaine| 
+                        { 
+                            recurrent || (!recurrent && *semaine == id_semaine) //si cours recurrent on insert dans toutes les semaines, sinon seulement dans la semaine selectionnée
+                        })
+                    {
+                        let planning_prof = self.planning_prof.get_mut(&(*id_prof, *semaine)).unwrap();
+                        let planning_classe = self.planning_classe.get_mut(&(*id_classe, *semaine)).unwrap();
+                        let planning_salle = self.planning_room.get_mut(&(id_salle, id_type_salle, *semaine)).unwrap();
+                        
+                        for i in 0..creneau_dispo.2 {
+                            planning_prof.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
+                            planning_classe.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
+                            planning_salle.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, id_salle, *id_matiere);
+                        }   
+                        
+                        if nb_heure_restant == 0 {
+                            self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *semaine), *nb_heure);   
+                        }
                     }   
-                    nb_heure_restant -= creneau_dispo.2; //duree du creneau
-                    if nb_heure_restant == 0 {
-
-                        self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), *nb_heure);   
-                    }
                 }
               
                 //si plus d'heure de repas dispo, alors on annule les inserts
@@ -532,9 +633,11 @@ impl PlanningWindow {
    
             }      
         }
-
-
     }
+
+
+   
+
     pub fn get_dispo_salle(&self, creneau_dispo: &(usize,usize,usize,bool), id_type_salle:&usize, id_semaine: &usize) -> (usize,bool) {
         let mut creneau_dispo_salle: (usize,usize,bool) = (creneau_dispo.0, creneau_dispo.1, false);  
         let mut id_salle: usize = 0;

@@ -134,9 +134,9 @@ fn creation_table() -> Result<()> {
     conn.execute("CREATE TABLE IF NOT EXISTS MatiereInterClasse
                     (
                         id INTEGER,
-                        id_matiere_prog INTEGER,
+                        id_matiere INTEGER,
                         id_classe INTEGER,
-                        FOREIGN KEY (id_matiere_prog) REFERENCES MatiereProg(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE
                     )",
         ()
