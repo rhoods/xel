@@ -136,8 +136,10 @@ fn creation_table() -> Result<()> {
                         id INTEGER,
                         id_matiere INTEGER,
                         id_classe INTEGER,
+                        id_classe_participante INTEGER,
                         FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
-                        FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE
+                        FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_classe_participante) REFERENCES Classe(id) ON DELETE CASCADE
                     )",
         ()
     )?;

@@ -288,7 +288,7 @@ impl AssignationWindow {
                                                     let options: Vec<Arc<Classe>> = 
                                                                     self.classe.clone()//.iter()
                                                                     .values()
-                                                                    .filter(|classe| {classe.get_filiere().get_id() == self.selected_filiere_id && self.selected_classe_id != Some(classe.get_id())})
+                                                                    .filter(|classe| {classe.get_filiere().get_id() == self.selected_filiere_id /*&& self.selected_classe_id != Some(classe.get_id())*/})
                                                                     .map(|classe| Arc::clone(classe))
                                                                     .collect();
                                                     
@@ -298,7 +298,7 @@ impl AssignationWindow {
                                                         .auto_shrink([false, true])   
                                                         .show(ui, |ui| {  
                                                             
-                                                            let mut i: usize = 0;
+                                                            /*let mut i: usize = 0;
                                                             let mut selected = match self.selected_all.get(&(self.selected_classe_id.unwrap(),id_matiere_prog.1)){
                                                                 Some(select) => *select,
                                                                 None => false,
@@ -314,22 +314,37 @@ impl AssignationWindow {
                                                                     }
                                                                     i += 1 ;
                                                                 }
-                                                            }
+                                                            }*/
     
-                                                            i = 0;
+                                                            //i = 0;
                                                             for (_cle,option) in options.iter().enumerate(){
-                                                                let mut selected = self.selected_liste_classe.contains_key(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, option.get_id()));
-                                               
-                                                                if ui.checkbox(&mut selected, format!("{:}",option.get_name())).changed() {
-                                                                    if selected {
-                                                                        self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,option.get_id()), self.selected_classe_id.unwrap());// Arc::clone(option)
-                                                                    } else {
-                                                                        self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(),id_matiere_prog.1, option.get_id()));
-                                                                        self.selected_all.insert((self.selected_classe_id.unwrap(),id_matiere_prog.1), false);
+                                                                //for (_cle2,option2) in options.iter().enumerate(){
+                                                                    let mut selected = self.selected_liste_classe.contains_key(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, option.get_id()));
+                                                                    //let mut selected = self.selected_liste_classe.contains_key(&(option.get_id(), id_matiere_prog.1, option.get_id()));
+                                                                    if ui.checkbox(&mut selected, format!("{:}",option.get_name())).changed() {
+                                                                        
+                                                                            if selected {
+                                                                                self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,option.get_id()), self.selected_classe_id.unwrap());// Arc::clone(option)
+                                                                                //self.selected_liste_classe.insert((option.get_id(), id_matiere_prog.1,option.get_id()), option.get_id());
+                                                                            } else {
+                                                                                //self.selected_liste_classe.remove(&(option.get_id(), id_matiere_prog.1,option.get_id()));
+                                                                                //self.selected_all.insert((option.get_id(),id_matiere_prog.1), false);
+                                                                                self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(),id_matiere_prog.1, option.get_id()));
+                                                                                self.selected_all.insert((self.selected_classe_id.unwrap(),id_matiere_prog.1), false);
+                                                                            }
+                                                                        
                                                                     }
-                                                                }
-                                                                i += 1 ;
+                                                                //}
+                                                               // i += 1 ;
                                                             }
+                                                            
+                                                            let mut selected_liste_classe: HashMap<(usize,usize,usize), usize> = HashMap::new();
+                                                            for ((classe_saisie, matiere,classe), _val) in self.selected_liste_classe.iter(){
+                                                                selected_liste_classe.insert((*classe_saisie, *matiere, *classe), *classe_saisie);
+                                                                selected_liste_classe.insert((*classe, *matiere, *classe), *classe);
+                                                                selected_liste_classe.insert((*classe, *matiere, *classe_saisie), *classe);
+                                                            }
+                                                            self.selected_liste_classe = selected_liste_classe;
     
                                                         });
                                                     });
