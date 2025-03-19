@@ -374,7 +374,7 @@ impl  SchedulerApp {
     } //AssignationWindow
 
     fn show_generations_window(&mut self, ctx: &Context){
-        self.planning_window.charge(self.rooms.clone(), self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone(), self.horaires.clone());
+        self.planning_window.charge(self.rooms.clone(), self.semaines.clone(),self.classes.clone(), self.filieres.clone(),self.matieres.clone(),self.matieres_prog.clone(),   self.matieres_inter_classe.clone(), self.teachers.clone(), self.groupe.clone(), self.assignement.clone(), self.horaires.clone(), self.selected_liste_inter_classe.clone());
         self.planning_window.build(ctx);
     }
 
