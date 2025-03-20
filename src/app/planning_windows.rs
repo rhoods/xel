@@ -35,8 +35,8 @@ pub struct PlanningWindow {
     nb_semaine_max_par_filiere: HashMap<usize, usize>,// (id_filiere, nb_semaine)
     //liste_creneau_a_placer: HashMap<(usize,usize,usize,usize,usize), (usize, usize, usize)>, //<(id_classe, id_prof,id_matiere, id_groupe,id_semaine), (nb_heure, duree_mini, duree_max)>
     liste_creneau_a_placer: HashMap<(usize,usize,usize,usize,usize), (usize, usize, usize, HashSet<usize>,HashSet<usize>,HashSet<(usize,usize)>,)>,  //<(id_classe, id_prof,id_matiere, id_groupe,id_semaine), (nb_heure, duree_mini, duree_max, liste des classe, liste des profs, les des groupes et prof correspondant)>
-    liste_creneau_placer: HashMap<(usize,usize,usize,usize,usize), usize>,
-    liste_creneau_non_placer: HashMap<(usize,usize,usize,usize,usize), usize>,
+    liste_creneau_placer: HashMap<(usize,usize,usize,usize,usize), (usize, HashSet<usize>,HashSet<usize>,HashSet<(usize,usize)>)>,
+    liste_creneau_non_placer: HashMap<(usize,usize,usize,usize,usize), (usize, HashSet<usize>,HashSet<usize>,HashSet<(usize,usize)>)>,
     planning_prof: HashMap<(usize,usize), Planning>, //(id_prof, num semaine), planning
     planning_classe: HashMap<(usize,usize), Planning>, //(id_classe, num semaine), planning
     planning_room: HashMap<(usize,usize,usize), Planning>, //(id_room,id_type_salle, num semaine), planning
@@ -278,7 +278,7 @@ impl PlanningWindow {
                     };
                     let actif_ou_repas = creneau.get_dispo();
                     
-                    if actif_ou_repas == TypeCreneau::Actif{
+                    if actif_ou_repas == TypeCreneau::Actif || actif_ou_repas == TypeCreneau::Repas {
                         planning.init_planning(*id_jour, *id_heure, actif_ou_repas, etat);
                     }
                 }
@@ -292,7 +292,7 @@ impl PlanningWindow {
                 //.filter(|((id_jour, id_heure), creneau)| { creneau.get_dispo() != TypeCreneau::Desactive })
                 {
                     let actif_ou_repas = creneau.get_dispo();
-                    if actif_ou_repas == TypeCreneau::Actif{
+                    if actif_ou_repas == TypeCreneau::Actif || actif_ou_repas == TypeCreneau::Repas {
                         planning.init_planning(*id_jour, *id_heure, actif_ou_repas, Etat::Disponible);
                     }
                 }
@@ -307,7 +307,7 @@ impl PlanningWindow {
                 //.filter(|((id_jour, id_heure), creneau)| { creneau.get_dispo() != TypeCreneau::Desactive })
                 {
                     let actif_ou_repas = creneau.get_dispo();
-                    if actif_ou_repas == TypeCreneau::Actif{
+                    if actif_ou_repas == TypeCreneau::Actif || actif_ou_repas == TypeCreneau::Repas {
                         planning.init_planning(*id_jour, *id_heure, actif_ou_repas, Etat::Disponible);
                     }
                 }
@@ -535,7 +535,7 @@ impl PlanningWindow {
         self.alim_creneau_a_placer(true);  // --> diviser en groupe avec le meme prof et groupe profs différents
         self.filtrage_cours_non_recurent(liste_semaine.clone()); 
         liste_cours_en_groupe_prof_different = self.liste_cours_en_groupe_prof_different();
-        dbg!(&liste_cours_en_groupe_prof_different);
+        //dbg!(&liste_cours_en_groupe_prof_different);
         self.place_les_creneaux(true, &mut liste_semaine, true, &liste_cours_en_groupe_prof_different); //-> modifier la recherche de la durée du creneau si le prof est le même pour chaque groupe
                                     // --> modifier la recherche des creneaux disponibles si les profs sont différents pour chaque groupe
                                     // --> + cours récurent, donc dès qu'une occurrence est trouvée, la placer pour toutes les semaines et ne pas traiter les autres semaine dans la boucle
@@ -551,7 +551,7 @@ impl PlanningWindow {
 
         //on place d'abord les cours restant en groupe et non en groupe qui ne reviennent pas chaque semaine
         self.alim_creneau_a_placer(false);
-        self.filtrage_cours_non_recurent(liste_semaine.clone());
+        //self.filtrage_cours_non_recurent(liste_semaine.clone());
         self.place_les_creneaux(false, &mut liste_semaine, false, &liste_cours_en_groupe_prof_different);
         //debut placement des creneaux
         
@@ -605,13 +605,13 @@ impl PlanningWindow {
             };
 
             let mut liste_planning :  HashMap<(usize, usize, usize), Planning> = HashMap::new();      //let liste_planning_groupe: HashMap<usize, &Planning> = HashMap::new();
-                for prof in liste_prof {
+                for prof in liste_prof.iter() {
                     match self.planning_prof.get(&(*prof, *id_semaine)) {
                         Some(planning) => {liste_planning.insert((1,*prof, *id_semaine),planning.clone())},
                         None => continue
                     };
                 }
-                for classe in liste_classe {
+                for classe in liste_classe.iter() {
                     match self.planning_classe.get(&(*classe, *id_semaine)) {
                         Some(planning) => {liste_planning.insert((2,*classe, *id_semaine),planning.clone())},
                         None => continue
@@ -622,7 +622,7 @@ impl PlanningWindow {
                 //dbg!(&nb_max_passage);
                 if nb_max_passage > 4000 {
                     self.generation_reussi = false;
-                    self.liste_creneau_non_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), nb_heure_restant);   
+                    self.liste_creneau_non_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), (nb_heure_restant, liste_prof.clone(), liste_classe.clone(), liste_groupe.clone()));   
                     break;
                 }
                 //trouve un creneau disponible pour le prof et la classe
@@ -665,7 +665,7 @@ impl PlanningWindow {
                         }   
                         
                         if nb_heure_restant == 0 {
-                            self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *semaine), *nb_heure);   
+                            self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *semaine), (*nb_heure, liste_prof.clone(), liste_classe.clone(), liste_groupe.clone()));   
                         }
                     }   
                 }
@@ -743,9 +743,38 @@ impl PlanningWindow {
             for i in 0..new_duree_max { 
                 creneau_trouve = false;
                 if let Some(new_creneau) = planning.get_creneau(*jour,*heure + i){
-                        if new_creneau.get_prof().is_none(){
-                            creneau_trouve = true;
-                        }      
+                    let creneau = new_creneau.clone();
+                    let mut actif = 
+                            match creneau.preference.unwrap() {
+                                Etat::Disponible => true,
+                                Etat::Preference => true,
+                                Etat::Indisponible => false,
+                                _ => false,
+                            };
+                    
+                    let repas =
+                    match creneau.actif_ou_repas.unwrap() {
+                        TypeCreneau::Actif => false,
+                        TypeCreneau::Repas => true,
+                        TypeCreneau::Desactive => false,
+                        _ => false,
+                    };
+                    if repas{
+                        actif = false;
+                        for h in 0..*heure{
+                            if let Some(creneau_repas) = planning.get_creneau(*jour,h){
+                                let creneau = creneau_repas.clone();
+                                if creneau.clone().actif_ou_repas.unwrap() == TypeCreneau::Repas && creneau.get_prof().is_none(){
+                                    actif = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if new_creneau.get_prof().is_none() && actif{
+                        creneau_trouve = true;
+                    }      
                 }
                 if !creneau_trouve {
                     new_duree_max -= duree_min;
@@ -787,9 +816,21 @@ impl PlanningWindow {
             let mut dispo: bool = true;
             for (_, planning) in liste_planning.iter() {
                 if let Some(creneau) = planning.get_creneau(*jour, *heure){
+                    let actif = 
+                        match creneau.clone().preference.unwrap() {
+                            Etat::Disponible => true,
+                            Etat::Preference => true,
+                            Etat::Indisponible => false,
+                            _ => false,
+                        };
+                    if !actif {
+                        dispo = false
+                    }
                     if !creneau.get_prof().is_none(){
                         dispo = false
                     }
+                }else{
+                    dispo = false;
                 }
             }
             if !dispo {
