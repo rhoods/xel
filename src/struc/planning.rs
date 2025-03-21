@@ -12,10 +12,12 @@ use rand::Rng;
 pub struct Creneaux {
     pub id_prof: Option<usize>,
     pub id_classe: Option<usize>, //Option<Arc<Classe>>,
+    pub id_groupe: Option<usize>,
     pub id_salle: Option<usize>,//Option<Room>,
     pub id_matiere: Option<usize>,//Option<Room>,
     pub actif_ou_repas: Option<TypeCreneau>,
     pub preference: Option<Etat>,
+    pub cours_groupe: Option<HashMap<(usize,usize),usize>>, //(groupe, prof), salle
 }
 
 impl Creneaux{
@@ -23,10 +25,12 @@ impl Creneaux{
         Self{
             id_prof: None,
             id_classe: None,
+            id_groupe: None,
             id_salle: None,
             id_matiere: None,
             actif_ou_repas: None,
             preference: None,
+            cours_groupe: None,
         }
     }
 
@@ -50,6 +54,9 @@ impl Creneaux{
     pub fn get_classe(&self) -> &Option<usize>{ // &Option<Arc<Classe>>{
         &self.id_classe
     }
+    pub fn get_groupe(&self) -> &Option<usize>{ // &Option<Arc<Classe>>{
+        &self.id_groupe
+    }
     pub fn get_salle(&self) -> &Option<usize>{ // &Option<Room>{
         &self.id_salle
     }
@@ -63,6 +70,9 @@ impl Creneaux{
     pub fn set_classe(&mut self, classe: Option<usize>) { //Option<Arc<Classe>>) {
         self.id_classe = classe;
     }
+    pub fn set_groupe(&mut self, groupe: Option<usize>) { //Option<Arc<Classe>>) {
+        self.id_groupe = groupe;
+    }
     pub fn set_salle(&mut self, salle: Option<usize>) { //Option<Room>) {
         self.id_salle = salle;
     }
@@ -70,6 +80,12 @@ impl Creneaux{
         self.id_matiere = matiere;
     }
 
+    pub fn get_cours_groupe(&self) -> &Option<HashMap<(usize,usize),usize>>{ //&Option<Teacher>{
+        &self.cours_groupe
+    }
+    pub fn set_cours_groupe(&mut self, cours_groupe: HashMap<(usize,usize),usize>){ //&Option<Teacher>{
+        self.cours_groupe = Some(cours_groupe);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -123,20 +139,28 @@ impl Planning {
         self.planning.get(&(id_jour, id_heure))
     }
     
-    pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_salle: usize, id_matiere: usize) {
+    pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_groupe: usize, id_salle: usize, id_matiere: usize) {
         let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();   
         creneaux.id_classe =  Some(id_classe);
+        creneaux.id_groupe = Some(id_groupe);
         creneaux.id_prof =  Some(id_prof);
         creneaux.id_salle =  Some(id_salle);
         creneaux.id_matiere =  Some(id_matiere);
     }
 
+    pub fn set_creneau_cours_multiple(&mut self, id_jour: usize, id_heure: usize, cours_groupe: HashMap<(usize,usize),usize>){
+        let creneaux: &mut Creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();
+        creneaux.cours_groupe = Some(cours_groupe); 
+    }
+
     pub fn reset_creneau(&mut self, id_jour: usize, id_heure: usize) {
         let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();   
         creneaux.id_classe =  None;
+        creneaux.id_groupe = None;
         creneaux.id_prof =  None;
         creneaux.id_salle =  None;
         creneaux.id_matiere =  None;
+        creneaux.cours_groupe = None;
     }
 
     pub fn get_verif_random_creneau(&self) -> (usize,usize,bool) {
