@@ -148,7 +148,7 @@ fn creation_table() -> Result<()> {
     conn.execute("CREATE TABLE IF NOT EXISTS Groupe
                     (
                         id PRIMARY KEY,
-                        name TEXT,
+                        name INTEGER,
                         id_matiere INTEGER,
                         id_classe INTEGER,
                         FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,

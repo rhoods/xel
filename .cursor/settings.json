@@ -1,0 +1,9 @@
+{
+    "llm": {
+        "provider": "local",
+        "model": "http://localhost:1234",
+        "contextWindow": 4096,
+        "temperature": 0.7,
+        "maxTokens": 2048
+    }
+} 

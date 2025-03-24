@@ -16,15 +16,17 @@ use std::collections::{HashMap};
 #[derive(Clone, Debug)]
 pub struct Groupe  {
     id:usize,
+    name: usize,
     classe: Arc<Classe>,
     matiere: Arc<Matiere>,
 
 }
 
 impl Groupe {
-    pub fn new( id: usize, classe: Arc<Classe>, matiere: Arc<Matiere>,) -> Self{
+    pub fn new( id: usize,name:usize, classe: Arc<Classe>, matiere: Arc<Matiere>,) -> Self{
         Self {
             id,
+            name,
             classe,
             matiere,
             
@@ -32,6 +34,9 @@ impl Groupe {
     }
     pub fn get_id(&self) -> &usize  {
         &self.id
+    }
+    pub fn get_name(&self) -> &usize  {
+        &self.name
     }
     pub fn get_matiere(&self) -> &Arc<Matiere>  {
         &self.matiere

@@ -133,6 +133,7 @@ impl PlanningWindow {
                     }
                 });
 
+                
                 ui.horizontal(|ui| {
                     for ((id_prof,id_semaine), planning) in self.planning_prof.iter()
                     .filter(|((id_prof_planning,id_semaine), planning)| {self.selected_prof_id == *id_prof_planning}) 
@@ -175,6 +176,9 @@ impl PlanningWindow {
                             
                             let mut dispo: (usize,usize,bool);
                             let mut creneau: Option<&Creneaux>;
+                            let mut cours_groupe: HashMap<(usize,usize),usize>= HashMap::new();
+
+                            
                             for (hour_idx, hour) in hours.iter().enumerate() {
                                 //genere les noms des plages horaires
                                 let response_hours = ui.add_sized(cell_size, egui::SelectableLabel::new(false,*hour)); //ui.label(*hour);
@@ -191,6 +195,12 @@ impl PlanningWindow {
                                         let planning = self.planning_prof.get(&(self.selected_prof_id, self.selected_semaine_id)).unwrap();
                                         dispo  = planning.get_verif_creneau(days_idx, hour_idx);
                                         creneau = planning.get_creneau(days_idx, hour_idx);
+                                        match creneau{
+                                            Some(cre) => cours_groupe = cre.cours_groupe.clone().unwrap_or(HashMap::new()),
+                                            None => cours_groupe = HashMap::new(),
+                                        };
+                                        
+                                        
                                     }else{
                                         dispo  = (days_idx, hour_idx, true);
                                         creneau = None;
@@ -206,14 +216,61 @@ impl PlanningWindow {
                                     //dbg!(&creneau);
                                     let text = 
                                         if !dispo.2 && !creneau.is_none() { 
-                                            let prof = self.teachers.get(&creneau.unwrap().id_prof.unwrap()).unwrap();
-                                            let classe = self.classe.get(&creneau.unwrap().id_classe.unwrap()).unwrap();
-                                            let salle = self.salle.get(&creneau.unwrap().id_salle.unwrap()).unwrap();
-                                            let matiere = self.matiere.get(&creneau.unwrap().id_matiere.unwrap()).unwrap();
+                                            
+                                            let mut prof = self.teachers.get(&creneau.unwrap().id_prof.unwrap()).unwrap();
+                                            let mut classe = self.classe.get(&creneau.unwrap().id_classe.unwrap()).unwrap();
+                                            let mut salle = self.salle.get(&creneau.unwrap().id_salle.unwrap()).unwrap();
+                                            let mut matiere = self.matiere.get(&creneau.unwrap().id_matiere.unwrap()).unwrap();
+                                            let mut groupe = self.groupe.get(&creneau.unwrap().id_groupe.unwrap()).unwrap();
 
-                                            format!("{:} \n {:} \n {:} \n {:}", prof.get_name(), classe.get_name(), salle.get_name(), matiere.get_name()) 
+                                            let mut salle_name = salle.get_name().clone();
+                                            let mut prof_name = prof.get_name().clone();
+                                            //variable temp en attendant juste pour visualiser les données lors des tests /////
+                                            let mut affiche_liste_groupe: String = String::new();
+                                            let mut affiche_liste_prof: String = String::new();
+                                            let mut affiche_liste_salle: String = String::new();
+                                            ////////////////////////////////////////////////////////////////////////////
+                                            
+                                            let mut groupe_name: String = String::new();
+                                            let mut l_groupe: HashMap<usize,usize> = HashMap::new();
+                                            let mut l_prof: HashSet<usize> = HashSet::new();
+                                            
+                                            let mut numero_groupe = 1;
+                                            if cours_groupe.len() > 1 {
+                                                groupe_name = format!("groupe {:}", groupe.get_name().to_string());
+                                                
+                                                //pour voir si les profs sont des profs différents ou non
+                                                for (i,((id_groupe, id_prof), id_salle) ) in cours_groupe.iter().enumerate()
+                                                {
+                                                    l_prof.insert(*id_prof);
+                                                } 
+                                                
+
+
+                                            }
+                                            if l_prof.len() > 1{
+                                                for (i,((id_groupe, id_prof), id_salle) ) in cours_groupe.iter().enumerate()
+                                                {
+                                                    if self.selected_prof_id == *id_prof {
+                                                        salle_name = id_salle.to_string();
+                                                        prof_name = self.teachers.get(id_prof).unwrap().get_name();
+                                                        //groupe_name = groupe.get_name().to_string();
+                                                        groupe_name = format!("groupe {:}",self.groupe.get(id_groupe).unwrap().get_name().to_string());   
+                                                    }
+                                                }
+                                            }
+                                            if groupe_name.len()> 1{
+                                                /*for (i, id_g) in l_groupe.iter().enumerate().filter(|(i,id_g)|{ *id_g == groupe.get_id()}){
+                                                    groupe_name = format!("groupe {:}", i + 1);
+                                                }*/
+                                                
+                                                format!(" {:} \n {:} - {:} \n {:}\n {:}", prof_name, classe.get_name(),groupe_name, salle_name, matiere.get_name() )
+                                            }else{
+                                                format!(" {:} \n {:} \n {:} \n {:}", prof_name, classe.get_name(), salle_name, matiere.get_name() )
+                                            }
+                                            
                                         } else { 
-                                            format!("{:} \n {:} \n {:} \n {:}", " ".to_string(), " ".to_string(), " ".to_string(), " ".to_string()) 
+                                            format!("{:} \n {:} \n {:} \n {:} ", " ".to_string(), " ".to_string(), " ".to_string(), " ".to_string()) 
                                         };
                                     // Création d'un Frame aHashMap la couleur d'arrière-plan
                                     Frame::none()
@@ -655,15 +712,22 @@ impl PlanningWindow {
                 
                 //verification qu'une salle est disponible
                 let mut id_salle: Vec<usize> = Vec::new();
-                let dispo_salle: bool;
+                let mut dispo_salle: bool ;
                 (id_salle, dispo_salle) = self.get_dispo_salle(&creneau_dispo, &id_type_salle, &id_semaine, nb_prof);
-                
 
                 if !dispo_salle {
                     nb_max_passage += 1;
                     continue;
                 }else{
                     //CRENEAU TROUVE
+                    if id_salle.len() == 0 && dispo_salle{
+                        println!("ERREUR!!!!!!");
+                        dbg!(&dispo_salle);
+                        dbg!(&id_salle);
+                        dbg!(&creneau_dispo);
+                        dbg!(&(&id_classe, &id_prof, &id_matiere, &id_groupe, &id_semaine));
+                    }
+
                     nb_heure_restant -= creneau_dispo.2;
                     
                     for semaine in liste_semaine.iter()
@@ -680,9 +744,10 @@ impl PlanningWindow {
                         
                         for ((source, id, _semaine_planning), planning) in liste_planning.iter_mut()
                         {
+                            let mut cours_groupe:HashMap<(usize,usize), usize> = HashMap::new();
                             if nb_prof > 1{
                                 
-                                let mut cours_groupe:HashMap<(usize,usize), usize> = HashMap::new();
+                                
                                 for i in 0..creneau_dispo.2 {
                                     let mut y: usize = 0;
                                     for (groupe, prof) in liste_groupe.iter(){
@@ -694,15 +759,22 @@ impl PlanningWindow {
                                     planning.set_creneau_cours_multiple(creneau_dispo.0, creneau_dispo.1 + i,cours_groupe.clone());
                                 }
                             } else{
+                                
                                 for i in 0..creneau_dispo.2 {
-                                    planning.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, *id_groupe, id_salle[0], *id_matiere);
+                                    let mut y: usize = 0;
+                                    for (groupe, prof) in liste_groupe.iter(){
+                                        y += 1;
+                                        planning.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, *id_groupe, id_salle[0], *id_matiere);
+                                        cours_groupe.insert((*groupe, *prof),id_salle[0]);
+                                    }
+                                    planning.set_creneau_cours_multiple(creneau_dispo.0, creneau_dispo.1 + i,cours_groupe.clone());
                                 }
+                                
                             }
                             
                         }
 
                         for salle in id_salle.iter(){
-
                             let planning_salle = self.planning_room.get_mut(&(*salle, id_type_salle, *semaine)).unwrap();
                             for i in 0..creneau_dispo.2 {
                                 planning_salle.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *id_classe, *id_groupe, *salle, *id_matiere);     
@@ -770,11 +842,14 @@ impl PlanningWindow {
         let mut id_salle: Vec<usize> = Vec::new();
         
         for (id_room, _room) in self.salle.iter().filter(|(_id, room)|{room.get_room_type().get_id() == *id_type_salle}){
-            if !creneau_dispo_salle.2 && id_salle.len() < nb_prof {
-                let mut dispo = true;
+            creneau_dispo_salle.2 = false;
+            let mut dispo = true;
+            if id_salle.len() < nb_prof {
+                
                 for salle in id_salle.iter(){
                     if salle == id_room {
-                        dispo = false
+                        dispo = false;
+                        break;
                     }
                 }
                 if dispo {
@@ -782,14 +857,23 @@ impl PlanningWindow {
                         match self.planning_room.get(&(*id_room, *id_type_salle, *id_semaine)) {
                             Some(planning_room) => {  
                                                                 creneau_dispo_salle = planning_room.get_verif_creneau(creneau_dispo.0, creneau_dispo.1 + i);
-                                                                if creneau_dispo_salle.2{
-                                                                    id_salle.push(*id_room);
+                                                                
+                                                                if !creneau_dispo_salle.2{
+                                                                    dispo = false;
+                                                                    break;
                                                                 }
                                                             },
-                            None => continue,
+                            None => {dispo = false; creneau_dispo_salle.2 = false; break},
                         }
                     }
                 }
+                if dispo {
+                    id_salle.push(*id_room);
+                    if id_salle.len() == nb_prof {
+                        break;
+                    }
+                }
+                
             } else {
                 break;
             }

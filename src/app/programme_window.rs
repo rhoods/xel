@@ -492,7 +492,7 @@ impl ProgrammeWindow {
 
                             for i in 0..*nb_groupe {
                                 for (id, classe) in self.classes.iter().filter(|(id, classe)| { classe.get_filiere().get_id() == self.selected_filiere_id}){
-                                    self.groupe.insert(self.id_groupe, Arc::new(Groupe::new(self.id_groupe,Arc::clone(classe), Arc::clone(self.liste_selected_matiere.get(&self.selected_filiere_id).unwrap()))));
+                                    self.groupe.insert(self.id_groupe, Arc::new(Groupe::new(self.id_groupe,i + 1, Arc::clone(classe), Arc::clone(self.liste_selected_matiere.get(&self.selected_filiere_id).unwrap()))));
                                     self.id_groupe += 1;
                                 }
                             } 

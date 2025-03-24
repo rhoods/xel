@@ -664,18 +664,19 @@ impl  SchedulerApp {
 
 
 
-        let mut recup_groupe = conn.prepare("SELECT id, id_matiere, id_classe FROM Groupe")?;
+        let mut recup_groupe = conn.prepare("SELECT id, name, id_matiere, id_classe FROM Groupe")?;
         let rows = recup_groupe.query_map([], |row| {
             let id_groupe: usize = row.get(0)?;
-            let id_matiere: usize = row.get(1)?;
-            let id_classe: usize = row.get(2)?;
-            Ok((id_groupe, id_matiere, id_classe))
+            let name: usize = row.get(1)?;
+            let id_matiere: usize = row.get(2)?;
+            let id_classe: usize = row.get(3)?;
+            Ok((id_groupe,name, id_matiere, id_classe))
         })?;
 
         for row in rows {
-            let (id_groupe, id_matiere, id_classe) = row?;
+            let (id_groupe, name, id_matiere, id_classe) = row?;
             match (self.matieres.get_key_value(&id_matiere), self.classes.get_key_value(&id_classe) ) {
-                (Some(matiere), Some(classe)) => self.groupe.insert(id_groupe, Arc::new(Groupe::new(id_groupe, Arc::clone(classe.1), Arc::clone(matiere.1)))),
+                (Some(matiere), Some(classe)) => self.groupe.insert(id_groupe, Arc::new(Groupe::new(id_groupe, name,Arc::clone(classe.1), Arc::clone(matiere.1)))),
                 _ => None,
             };
         }
