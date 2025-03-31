@@ -473,8 +473,6 @@ impl PlanningWindow {
                 groupe = liste_groupe.get(&(id_classe,*id_matiere)).unwrap().clone();
 
                 self.liste_creneau_a_placer.insert((id_classe, id_prof, *id_matiere, *id_groupe, id_semaine),(*matiere_prog.get_nb_heure(),*matiere_prog.get_duree_minimum(),*matiere_prog.get_duree_maximum(), classe, prof, groupe));
-                
-                //self.liste_creneau_a_placer.insert((id_classe,id_prof, *id_matiere, *id_groupe, id_semaine),(*matiere_prog.get_nb_heure(),*matiere_prog.get_duree_minimum(),*matiere_prog.get_duree_maximum()));
             }
         }
 
@@ -661,6 +659,19 @@ impl PlanningWindow {
                 }
             }
 
+            if liste_classe.len() > 1{
+                let mut creneau_deja_place_via_autre_classe = false;
+                for classe in liste_classe.iter(){
+                    if self.liste_creneau_placer.contains_key(&(*classe, *id_prof, *id_matiere, *id_groupe, *id_semaine)){
+                        creneau_deja_place_via_autre_classe = true;
+                        break;
+                    }
+                }
+                if creneau_deja_place_via_autre_classe {
+                    continue;
+                } 
+            }
+
             let mut nb_heure_restant = *nb_heure;
             let mut nb_max_passage = 0;
             let mut creneau_dispo:(usize,usize,usize,bool) = (1,1,1,false);
@@ -685,6 +696,15 @@ impl PlanningWindow {
             if nb_prof == 2 {
                 dbg!(&liste_prof);
             }
+
+            let mut nb_classe = 0;
+            let mut l_classe: HashSet<usize> = HashSet::new();
+            for classe in liste_classe.iter()
+            {
+                l_classe.insert(*classe);
+            }
+            nb_classe = l_classe.len();
+
             let mut liste_planning :  HashMap<(usize, usize, usize), Planning> = HashMap::new();      //let liste_planning_groupe: HashMap<usize, &Planning> = HashMap::new();
                 for prof in liste_prof.iter() {
                     match self.planning_prof.get(&(*prof, *id_semaine)) {
@@ -758,6 +778,19 @@ impl PlanningWindow {
                                     }
                                     planning.set_creneau_cours_multiple(creneau_dispo.0, creneau_dispo.1 + i,cours_groupe.clone());
                                 }
+                            }else if nb_classe > 1{
+                                for i in 0..creneau_dispo.2 {
+                                    for classe in liste_classe.iter(){
+                                        let mut groupe_classe : usize = 0;
+                                        for (id, groupe) in self.groupe.iter()
+                                        .filter(| (id, groupe)|{ groupe.get_classe().get_id() == *classe && groupe.get_matiere().get_id() == id_matiere}){
+                                            groupe_classe = *id;  
+                                        }
+                                        planning.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *id_prof, *classe, groupe_classe, id_salle[0], *id_matiere);
+                                        cours_groupe.insert((groupe_classe, *id_prof),id_salle[0]);  
+                                    } 
+                                    planning.set_creneau_cours_multiple(creneau_dispo.0, creneau_dispo.1 + i,cours_groupe.clone());
+                                }   
                             } else{
                                 
                                 for i in 0..creneau_dispo.2 {
@@ -787,32 +820,21 @@ impl PlanningWindow {
                                 for (groupe, prof) in liste_groupe.iter(){
                                     self.liste_creneau_placer.insert((*id_classe, *prof, *id_matiere, *groupe, *semaine), (*nb_heure, liste_prof.clone(), liste_classe.clone(), liste_groupe.clone()));   
                                 }
+                            } else if nb_classe > 1{
+                                for classe in liste_classe.iter(){
+                                    let mut groupe_classe : usize = 0;
+                                    for (id, groupe) in self.groupe.iter()
+                                    .filter(| (id, groupe)|{ groupe.get_classe().get_id() == *classe && groupe.get_matiere().get_id() == id_matiere}){
+                                        groupe_classe = *id;  
+                                    }
+                                    self.liste_creneau_placer.insert((*classe, *id_prof, *id_matiere, groupe_classe, *semaine), (*nb_heure, liste_prof.clone(), liste_classe.clone(), liste_groupe.clone()));   
+                                }
                             } else{
                                 self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *semaine), (*nb_heure, liste_prof.clone(), liste_classe.clone(), liste_groupe.clone()));                        
                             }
                         }
                     }   
-                }
-                
-                //si plus d'heure de repas dispo, alors on annule les inserts
-                /*if !self.get_dispo_repas(*id_prof, *id_semaine,creneau_dispo.0) || !self.get_dispo_repas(*id_classe, *id_semaine,creneau_dispo.0) {
-                    let planning_prof = self.planning_prof.get_mut(&(*id_prof, *id_semaine)).unwrap();
-                    let planning_classe = self.planning_classe.get_mut(&(*id_classe, *id_semaine)).unwrap();
-                    let planning_salle = self.planning_room.get_mut(&(id_salle, id_type_salle, *id_semaine)).unwrap();
-
-                    for i in 0..creneau_dispo.2 {
-                        planning_prof.reset_creneau(creneau_dispo.0, creneau_dispo.1 + i);
-                        planning_classe.reset_creneau(creneau_dispo.0, creneau_dispo.1 + i);
-                        planning_salle.reset_creneau(creneau_dispo.0, creneau_dispo.1 + i);
-                    }
-                    nb_max_passage += 1;
-                    continue;
-
-                } else {
-                    nb_heure_restant -= creneau_dispo.2; //duree du creneau
-                    self.liste_creneau_placer.insert((*id_classe, *id_prof, *id_matiere, *id_groupe, *id_semaine), *nb_heure);
-                }*/
-   
+                }   
             }     
 
             for semaine in liste_semaine.iter()

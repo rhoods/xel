@@ -3,6 +3,8 @@
 //use std::collections::HashMap;
 
 use rusqlite::{params, Connection, Result};
+use eframe::egui::{self, Label, Response, pos2, vec2, Rect};
+
 mod app;
 mod struc;
 
@@ -17,11 +19,18 @@ fn main() -> eframe::Result<()> {
         Ok(_) => println!("creation de la base terminee")
         , Err(erreur) => println!("erreur lors de la base : {}", erreur)
     }
-
-    let native_options = eframe::NativeOptions::default();
+    
+    //let native_options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        window_builder: Some(Box::new(|builder| {
+            builder.with_min_inner_size(vec2(700.0, 300.0))
+        })),
+        // Autres options...
+        ..Default::default()
+    };
     eframe::run_native(
         "Générateur d'emploi du temps",
-        native_options,
+        options,
         Box::new(|_cc| Box::new(SchedulerApp::default())),
     )
 }

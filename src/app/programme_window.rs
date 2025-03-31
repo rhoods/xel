@@ -1,6 +1,7 @@
-use eframe::egui;
+use eframe::egui::{self, Label, Response, pos2, vec2, Rect};
+//use std::cmp;
 use std::sync::{Arc, Mutex};
-//use egui::{Context, Ui, Color32, Align2, Frame, Vec2};
+use egui::{Context, Ui, Color32, Align2, Frame, Vec2};
 use std::collections::{HashMap, HashSet};
 use crate::struc::assignation::Groupe;
 use crate::struc::matiere::Matiere;
@@ -54,6 +55,10 @@ pub struct ProgrammeWindow {
     selected_en_groupe_interclasse: HashMap<usize,bool>,
     liste_selected_matiere: HashMap<usize,Arc<Matiere>>,
     selected_matiere: String,
+    ajout_matiere:bool,
+
+    nom_option: HashMap<(usize,String), String>,     
+    new_nom_option:   HashMap<usize, String>,  
 }
 
 impl  Default for ProgrammeWindow  {
@@ -96,6 +101,10 @@ impl  Default for ProgrammeWindow  {
             selected_en_groupe_interclasse: HashMap::new(), //false,
             liste_selected_matiere: HashMap::new(),
             selected_matiere: String::new(),
+
+            ajout_matiere: false,
+            nom_option: HashMap::new(),
+            new_nom_option: HashMap::new(),
         }
     }
 }
@@ -137,7 +146,8 @@ impl ProgrammeWindow {
 
     }
 
-    pub fn build(&mut self, ctx: &egui::Context) {
+    pub fn build(&mut self, ctx: &egui::Context) 
+    {
         //egui::TopBottomPanel::top("onglets_filiere") //::new("Création des programmes")
         match self.select_matiere_prog_remove_id {
             Some(id) => {  
@@ -183,288 +193,535 @@ impl ProgrammeWindow {
         };
         self.id_groupe = *self.groupe.keys().max().unwrap_or(&0) + 1;
         self.id_matiere_prog = self.matiere_prog.keys().max().unwrap_or(&0) + 1;
+  
+
+        /*let frame = egui::Frame {
+            stroke: egui::Stroke::new(1.0, egui::Color32::GRAY),
+            inner_margin: egui::style::Margin::same(10.0),
+            fill: egui::Color32::from_rgb(13, 26, 53),
+            ..Default::default()
+        };*/
+
+        /*egui::SidePanel::left("panneau_gauche")
+        //.frame(frame)
+        .show(ctx, |ui| {
+            ui.vertical(|ui| {
+                //ajoute le prof si on clique sur valider ou sur la touche entrer
+                ui.add_space(10.0);
+                ui.heading("Filières");
+                ui.separator();
+                for (id_filiere, filiere) in self.filieres.iter() {
+                    if ui.selectable_label(&self.selected_filiere_id == id_filiere,format!("{:}", filiere.get_name())).clicked() {                                  
+                        self.selected_filiere_id = *id_filiere;
+                        if !self.nb_sem.get(&self.selected_filiere_id).is_none() {
+                            self.new_nb_sem = self.nb_sem.get(&self.selected_filiere_id).unwrap().unwrap().to_string();
+                        }
+                    }
+                }
+            });
+        });*/
+
+        /*egui::SidePanel::right("panneau_droite")
+        //.frame(frame)
+        .show(ctx, |ui| {
+            ui.vertical(|ui| {
+                //ajoute le prof si on clique sur valider ou sur la touche entrer
+                ui.add_space(10.0);
+                ui.heading("Options");
+                ui.separator();
+                egui::Grid::new("Grid112")
+                    .num_columns(1)
+                    .min_col_width(100.0)
+                    //.striped(true)
+                    .show(ui, |ui| {
+                        
+                        ui.label("Ajout d'une option: ");
+                        ui.end_row();
+                        let mut nom_option =
+                        match self.new_nom_option.get(&self.selected_filiere_id) {
+                            Some(nom) => nom.clone().unwrap(),
+                            None => String::new()
+                        };   
+
+                                        
+                        let response_nom_option = ui.text_edit_singleline(&mut nom_option);
+                        self.new_nom_option.insert(self.selected_filiere_id, Some(nom_option.clone()) );
+                        if response_nom_option.lost_focus() {
+                            match self.new_nom_option.get(&self.selected_filiere_id) {
+                                Some(nom) => {
+                                    if !self.nom_option.contains_key(&(self.selected_filiere_id, nom.clone().unwrap())){
+                                        self.nom_option.insert((self.selected_filiere_id, nom.clone().unwrap()), nom.clone().unwrap());
+                                    } else {
+                                        self.new_nom_option.clear();
+                                    }  
+                                },
+                                None => {
+                                    self.new_nom_option.clear();
+                                }
+                            }
+                        }
+
+                        
+                    });
+            });
+        });*/
 
         egui::CentralPanel::default()
             .show(ctx, |ui| {
                 //ui.vertical_centered(|ui| {
-                    ui.horizontal(|ui| {
-                        //ajoute le prof si on clique sur valider ou sur la touche entrer
-                        for (id_filiere, filiere) in self.filieres.iter() {
-                            if ui.selectable_label(&self.selected_filiere_id == id_filiere,format!("{:}", filiere.get_name())).clicked() {                                  
-                                self.selected_filiere_id = *id_filiere;
-                                if !self.nb_sem.get(&self.selected_filiere_id).is_none() {
-                                    self.new_nb_sem = self.nb_sem.get(&self.selected_filiere_id).unwrap().unwrap().to_string();
-                                }
-                            }
-                        }
-                    });
-                    ui.end_row();
-                    ui.horizontal(|ui| {
-                        ui.label("Nombre de semaine(s) du programme: ");
-                        let response_nb_sem = ui.text_edit_singleline(&mut self.new_nb_sem);
-                        if response_nb_sem.lost_focus() {
-                            match self.new_nb_sem.parse::<usize>() {
-                                Ok(nombre) => {
-                                    if nombre > 0 {
-                                        self.nb_sem.insert(self.selected_filiere_id, Some(nombre));
-                                        let filiere = self.filieres.get_mut(&self.selected_filiere_id).unwrap();
-                                        //filiere.nb_semaine = nombre;
-                                        let mut name_guard = filiere.nb_semaine.lock().unwrap();
-                                        *name_guard = nombre;
-                                        drop(name_guard);
-                                    } else {
-                                        self.new_nb_sem.clear();
-                                    }  
-                                },
-                                Err(_) => {
-                                    self.new_nb_sem.clear();
-                                }
-                            }
-                        }
-    
-                        let ajout_filiere = ((ui.button("Afficher").clicked() || 
-                            (response_nb_sem.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))) 
-                            && !self.nb_sem.get(&self.selected_filiere_id).is_none()
-                            ) || self.nb_sem_deja_valid.get(&self.selected_filiere_id).is_some()
-                            ;
-
-                        if ajout_filiere {
-                            //AFFICHE LES ELEMENTS DE SAISIE SI UN NOMBRE DE SEMAINE A ETE RENSEIGNER, A AMELIORER DANS LE CAS D'UN CHARGEMENT, CAR ON DOIT QUAND MEME CLIQUER POUR AFFICHER
-                            self.nb_sem_deja_valid.insert(self.selected_filiere_id);
-
-                            let exist = self.semaines.iter()
-                            .filter(|(_cle,semaine)| {semaine.get_filiere().get_id() == self.selected_filiere_id})
-                            .map(|(cle, _semaine)| *cle) // Clonage requis pour `Arc`
-                            .count();
-
-                            if exist == 0 {
-                                let nb_semaines = match self.nb_sem.get(&self.selected_filiere_id){
-                                    Some(Some(semaines)) => semaines,
-                                    Some(&None) => &0,
-                                    None => &0,
-                                };
-
-                                if nb_semaines > &0 {
-                                    if let Some(filiere) = self.filieres.get(&self.selected_filiere_id){
-                                        let mut i = 0;
-                                        while i < *nb_semaines {
-                                            //self.semaines.insert(id_max + i, Arc::new(Semaine::new(id_max + i, Arc::clone(filiere)))); 
-                                            self.semaines.insert((self.selected_filiere_id, i), Arc::new(Semaine::new(i, Arc::clone(filiere)))); 
-                                            i += 1 ;
-                                        }
-                                    }
-                                } 
-                            }                          
-                        }
-                    });
                     
-                    //SELECTION DES INFORMATIONS SUR LA MATIERE A AJOUTER
-                    if self.nb_sem_deja_valid.contains(&self.selected_filiere_id){
-
-                        ui.horizontal(|ui| {
-                            ui.label("Ajout d'une matière: ");
-
-                            self.selected_matiere = 
-                                    match self.liste_selected_matiere.get(&self.selected_filiere_id) {
-                                        Some(heure) => heure.get_name(),
-                                        None => String::new()
-                                    };
-                            egui::ComboBox::from_id_source("Matieres")
-                                .selected_text(&self.selected_matiere)
-                                .show_ui(ui, |ui| {
-                                    for  (id,matiere) in self.matieres.iter() {
-                                            //println!("{:?}",matiere.get_room_type());
-                                            if ui.selectable_label(self.selected_matiere == matiere.get_name(), matiere.get_name()).clicked() {
-                                                self.selected_matiere = (matiere.get_name()).to_string();
-                                                //self.selected_matiere_id = *id;
-                                                self.liste_selected_matiere.insert(self.selected_filiere_id, Arc::clone(matiere));
-                                            }
-                                    }
-                                });
-
-                                ui.label("Nombre d'heures: ");
-                                let mut nb_heure =
-                                    match self.new_nb_heure.get(&self.selected_filiere_id) {
-                                        Some(heure) => heure.clone(),
-                                        None => String::new()
-                                    };                           
-                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
-                                self.new_nb_heure.insert(self.selected_filiere_id, nb_heure.clone() );
-                                if response_nb_heure.lost_focus() {
-                                    match self.new_nb_heure.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
-                                        Ok(nombre) => {
-                                            if nombre > 0 {
-                                                self.nb_heure.insert(self.selected_filiere_id, Some(nombre));
-                                            } else {
-                                                self.new_nb_heure.clear();
-                                                self.nb_heure.insert(self.selected_filiere_id, Some(0));
-                                            }  
-                                        },
-                                        Err(_) => {
-                                            self.new_nb_heure.clear();
-                                            self.nb_heure.insert(self.selected_filiere_id, Some(0));
-                                        }
-                                    }
-                                }
-                            });
-
-
-                            ////Duree des creneaux min et max
-                            ui.horizontal(|ui| {
-                                ui.label("durée minimum d'un cours: ");
-                                let mut nb_heure =
-                                    match self.new_duree_minimum.get(&self.selected_filiere_id) {
-                                        Some(duree) => duree.clone(),
-                                        None => String::new()
-                                    };                           
-                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
-                                self.new_duree_minimum.insert(self.selected_filiere_id, nb_heure.clone() );
-                                if response_nb_heure.lost_focus() {
-                                    match self.new_duree_minimum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
-                                        Ok(nombre) => {
-                                            if nombre > 0 {
-                                                self.duree_minimum.insert(self.selected_filiere_id, Some(nombre));
-                                            } else {
-                                                self.new_duree_minimum.clear();
-                                                self.duree_minimum.insert(self.selected_filiere_id, Some(0));
-                                            }  
-                                        },
-                                        Err(_) => {
-                                            self.new_duree_minimum.clear();
-                                            self.duree_minimum.insert(self.selected_filiere_id, Some(0));
-                                        }
-                                    }
-                                }
-
-                                ui.label("durée maximum d'un cours: ");
-                                let mut nb_heure =
-                                    match self.new_duree_maximum.get(&self.selected_filiere_id) {
-                                        Some(duree) => duree.clone(),
-                                        None => String::new()
-                                    };                           
-                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
-                                self.new_duree_maximum.insert(self.selected_filiere_id, nb_heure.clone() );
-                                if response_nb_heure.lost_focus() {
-                                    match self.new_duree_maximum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
-                                        Ok(nombre) => {
-                                            if nombre > 0 {
-                                                self.duree_maximum.insert(self.selected_filiere_id, Some(nombre));
-                                            } else {
-                                                self.new_duree_maximum.clear();
-                                                self.duree_maximum.insert(self.selected_filiere_id, Some(0));
-                                            }  
-                                        },
-                                        Err(_) => {
-                                            self.new_duree_maximum.clear();
-                                            self.duree_maximum.insert(self.selected_filiere_id, Some(0));
-                                        }
-                                    }
-                                }
-                            });
-
-
-
-                            ui.horizontal(|ui| {
-                                let mut en_groupe =
-                                    match self.selected_en_groupe.get(&self.selected_filiere_id) {
-                                        Some(groupe) => *groupe,
-                                        None => false
-                                    };
-
-                                if ui.checkbox(&mut en_groupe, format!("Cours en groupe?")).changed(){
-                                    self.selected_en_groupe.insert(self.selected_filiere_id, en_groupe); 
-                                }
-
-                                if *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false) {
-                                    let response_nb_groupe = ui.text_edit_singleline(&mut self.new_nb_groupe);
-                                    if response_nb_groupe.lost_focus() {
-                                        match self.new_nb_groupe.parse::<usize>() {
-                                            Ok(nombre) => {
-                                                if nombre > 0 {
-                                                    self.nb_groupe.insert(self.selected_filiere_id, Some(nombre));
-                                                } else {
-                                                    self.new_nb_groupe.clear();
-                                                }  
-                                            },
-                                            Err(_) => {
-                                                self.new_nb_groupe.clear();
-                                            }
-                                        }
-                                    }
-                                }else{
-                                    self.nb_groupe.insert(self.selected_filiere_id, Some(1));
-                                    self.new_nb_groupe.clear();
-                                }
-                                
-                                let mut en_groupe_inter =
-                                    match self.selected_en_groupe_interclasse.get(&self.selected_filiere_id) {
-                                        Some(groupe) => *groupe,
-                                        None => false
-                                    };
-
-                                if ui.checkbox(&mut en_groupe_inter, format!("Cours interclasse?")).changed(){
-                                    self.selected_en_groupe_interclasse.insert(self.selected_filiere_id, en_groupe_inter);
-                                }
-                            });
+                ui.horizontal(|ui| {
+                    for (id_filiere, filiere) in self.filieres.iter() {
+                        if ui.selectable_label(&self.selected_filiere_id == id_filiere,format!("{:}", filiere.get_name())).clicked() {                                  
+                            self.selected_filiere_id = *id_filiere;
+                            if !self.nb_sem.get(&self.selected_filiere_id).is_none() {
+                                self.new_nb_sem = self.nb_sem.get(&self.selected_filiere_id).unwrap().unwrap().to_string();
+                            }
+                        }
+                    }
+                });
+                    //ui.end_row();
+                   let screen_rect = ctx.screen_rect();
+                   let available_rect = screen_rect;
+                   
+                   // Calculer les dimensions proportionnelles
+                   let width_ratio = 0.3; // 30% de la largeur
+                   let height_ratio = 0.2; // 20% de la hauteur
+                   let  width = ui.available_width() / 9.0;
+                   let  height = ui.available_height();
+                   
+                   let custom_region = Rect::from_min_max(
+                    pos2(100.0, 100.0),
+                    pos2(500.0, 400.0)
+                    );
                         
-                            //POUR FACILITER LA SAISIE DES COURS PRESENTS SUR PLUSIEURS SEMAINES
-                            ui.label("Liste des semaines auxquelles l'ajouter: ");
-                            egui::CollapsingHeader::new("Selection des semaines")
-                                .show(ui, |ui| {
-                                    let options: Vec<usize> = 
-                                                    self.semaines.clone()//.iter()
-                                                    .keys()
-                                                    .filter(|(id_filiere,_i)| {*id_filiere == self.selected_filiere_id})
-                                                    .map(|(_id_filiere, i)| *i)
-                                                    .collect();
-                                    
-                                    ui.vertical(|ui| {     
-                                        egui::ScrollArea::both() 
-                                        .auto_shrink([false, true])   
-                                        .show(ui, |ui| {  
-                                            
-                                            let mut i: usize = 0;
-                                            let mut selected = match self.selected_all.get(&self.selected_filiere_id){
-                                                Some(select) => *select,
-                                                None => false,
-                                            };
-                                            
-                                            if ui.checkbox(&mut selected, format!("Toutes")).changed() {
-                                                self.selected_all.insert(self.selected_filiere_id, selected);
-                                                for (_cle,option) in options.iter().enumerate(){
-                                                    if selected{
-                                                        self.selected_semaines.insert((self.selected_filiere_id, i),*option);   
-                                                    }else {
-                                                        self.selected_semaines.remove(&(self.selected_filiere_id, i));
-                                                    }
-                                                    i += 1 ;
-                                                }
-                                            }
+                    let area0 = egui::Area::new("top_center")
+                        .fixed_pos(pos2(
+                        available_rect.min.x + (available_rect.width() * 0.05), // 5% de marge
+                        available_rect.min.y + (available_rect.height() * 0.05) // 5% de marge
+                    ))
+                    //.constrain_to(custom_region)
+                    .anchor(Align2::CENTER_TOP,egui::vec2(0.0, 30.0)) // Ancrage au coin inférieur gauche de l'Area
+                    .pivot(Align2::CENTER_TOP)
+                    .show(ctx, |ui| {
+                        
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("Nombre de semaine(s) du programme: ");
+                            let response_nb_sem = ui.text_edit_singleline(&mut self.new_nb_sem);
+                            if response_nb_sem.lost_focus() {
+                                match self.new_nb_sem.parse::<usize>() {
+                                    Ok(nombre) => {
+                                        if nombre > 0 {
+                                            self.nb_sem.insert(self.selected_filiere_id, Some(nombre));
+                                            let filiere = self.filieres.get_mut(&self.selected_filiere_id).unwrap();
+                                            //filiere.nb_semaine = nombre;
+                                            let mut name_guard = filiere.nb_semaine.lock().unwrap();
+                                            *name_guard = nombre;
+                                            drop(name_guard);
+                                        } else {
+                                            self.new_nb_sem.clear();
+                                        }  
+                                    },
+                                    Err(_) => {
+                                        self.new_nb_sem.clear();
+                                    }
+                                }
+                            }
+                
+                            let ajout_filiere = (ui.button("Afficher").clicked() 
+                                && !self.nb_sem.get(&self.selected_filiere_id).is_none()
+                                ) || self.nb_sem_deja_valid.get(&self.selected_filiere_id).is_some()
+                                ;
+                            if ajout_filiere {
+                                //AFFICHE LES ELEMENTS DE SAISIE SI UN NOMBRE DE SEMAINE A ETE RENSEIGNER, A AMELIORER DANS LE CAS D'UN CHARGEMENT, CAR ON DOIT QUAND MEME CLIQUER POUR AFFICHER
+                                self.nb_sem_deja_valid.insert(self.selected_filiere_id);
 
-                                            i = 0;
-                                            for (_cle,option) in options.iter().enumerate(){
-                                                let mut selected = self.selected_semaines.contains_key(&(self.selected_filiere_id, i));
-                                                if ui.checkbox(&mut selected, format!("Semaine {:}",i)).changed() {
-                                                    if selected {
-                                                        self.selected_semaines.insert((self.selected_filiere_id, i), *option);
-                                                    } else {
-                                                        self.selected_semaines.remove(&(self.selected_filiere_id, i));
-                                                        self.selected_all.insert(self.selected_filiere_id, false);
-                                                    }
-                                                }
+                                let exist = self.semaines.iter()
+                                .filter(|(_cle,semaine)| {semaine.get_filiere().get_id() == self.selected_filiere_id})
+                                .map(|(cle, _semaine)| *cle) // Clonage requis pour `Arc`
+                                .count();
+
+                                if exist == 0 {
+                                    let nb_semaines = match self.nb_sem.get(&self.selected_filiere_id){
+                                        Some(Some(semaines)) => semaines,
+                                        Some(&None) => &0,
+                                        None => &0,
+                                    };
+
+                                    if nb_semaines > &0 {
+                                        if let Some(filiere) = self.filieres.get(&self.selected_filiere_id){
+                                            let mut i = 0;
+                                            while i < *nb_semaines {
+                                                //self.semaines.insert(id_max + i, Arc::new(Semaine::new(id_max + i, Arc::clone(filiere)))); 
+                                                self.semaines.insert((self.selected_filiere_id, i), Arc::new(Semaine::new(i, Arc::clone(filiere)))); 
                                                 i += 1 ;
                                             }
+                                        }
+                                    } 
+                                }                          
+                            }
+                            ui.add_space(50.0);
 
-                                        });
+                        });    
+                        //ui.separator();
+                    });
+                        
+                    
+                    //dbg!(&ui.available_width());
+                    //dbg!(&ui.available_size_before_wrap());
+                    
+                    
+               
+                    let position = Vec2::new(
+                        0.0, // 100 pixels depuis la gauche
+                        0.0  // 100 pixels depuis le bas
+                   );
+                   
+           
+                   let screen_rect = ctx.screen_rect();
+                   let available_rect = screen_rect;
+                   
+                   // Calculer les dimensions proportionnelles
+                   let width_ratio = 0.3; // 30% de la largeur
+                   let height_ratio = 0.2; // 20% de la hauteur
+
+                   let custom_region = Rect::from_min_max(
+                    pos2(100.0, 100.0),
+                    pos2(500.0, 400.0)
+                );
+                
+                /*egui::ScrollArea::both() // Activer le défilement vertical et horizontal
+                    .id_source(0)
+                    .auto_shrink([true, true]) // Permet à la zone de se rétrécir horizontalement, mais de ne pas se rétrécir verticalement
+                    .show(ui, |ui| {*/
+                   // Créer une Area à cette position
+                    if self.nb_sem_deja_valid.contains(&self.selected_filiere_id){
+                        
+                        let area_matiere = egui::Area::new("saisie_matiere")
+                            .fixed_pos(pos2(
+                                available_rect.min.x + (available_rect.width() * 0.05), // 5% de marge
+                                available_rect.min.y + (available_rect.height() * 0.05) // 5% de marge
+                            ))
+                            //.constrain_to(custom_region)
+                            //.movable(true)
+                            .anchor(Align2::LEFT_TOP,egui::vec2(50.0, 100.0)) // Ancrage au coin inférieur gauche de l'Area
+                            .pivot(Align2::LEFT_TOP)
+                            .show(ctx, |ui| 
+                            {
+                          
+                                    ui.columns(3, |columns| 
+                                        {
+                                            columns[0].allocate_ui_with_layout(
+                                                    Vec2::new(width/10.0, 10.0),
+                                                egui::Layout::left_to_right(egui::Align::LEFT),
+                                                |ui| 
+                                            {
+
+                                                egui::Grid::new("Grid111")
+                                                .num_columns(2)
+                                                .min_col_width(150.0)
+                                                //.striped(true)
+                                                .show(ui, |ui| 
+                                                {
+                                                    ui.add_space(50.0);
+                                                    ui.label("Ajout d'une matière: ");
+                                                    
+                                                    self.selected_matiere = 
+                                                        match self.liste_selected_matiere.get(&self.selected_filiere_id) {
+                                                            Some(matiere) => matiere.get_name(),
+                                                            None => String::new()
+                                                        };
+                                                            
+                                                    egui::ComboBox::from_id_source("Matieres")
+                                                        .selected_text(&self.selected_matiere)
+                                                        .show_ui(ui, |ui| 
+                                                        {
+                                                            for  (id,matiere) in self.matieres.iter() {
+                                                                //println!("{:?}",matiere.get_room_type());
+                                                                if ui.selectable_label(self.selected_matiere == matiere.get_name(), matiere.get_name()).clicked() {
+                                                                    self.selected_matiere = (matiere.get_name()).to_string();
+                                                                    //self.selected_matiere_id = *id;
+                                                                    self.liste_selected_matiere.insert(self.selected_filiere_id, Arc::clone(matiere));
+                                                                }
+                                                            }
+                                                        });
+
+                                                    ui.end_row();
+                                                    
+                                                    ui.add_space(50.0);
+                                                    ui.label("Nombre d'heures: ");
+                                                    
+                                                            let mut nb_heure =
+                                                                    match self.new_nb_heure.get(&self.selected_filiere_id) {
+                                                                        Some(heure) => heure.clone(),
+                                                                        None => String::new()
+                                                                    };                           
+                                                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
+                                                                self.new_nb_heure.insert(self.selected_filiere_id, nb_heure.clone() );
+                                                                if response_nb_heure.lost_focus() {
+                                                                    match self.new_nb_heure.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                                                        Ok(nombre) => {
+                                                                            if nombre > 0 {
+                                                                                self.nb_heure.insert(self.selected_filiere_id, Some(nombre));
+                                                                            } else {
+                                                                                self.new_nb_heure.clear();
+                                                                                self.nb_heure.insert(self.selected_filiere_id, Some(0));
+                                                                            }  
+                                                                        },
+                                                                        Err(_) => {
+                                                                            self.new_nb_heure.clear();
+                                                                            self.nb_heure.insert(self.selected_filiere_id, Some(0));
+                                                                        }
+                                                                    }
+                                                                }
+                                                    ui.end_row();
+
+                                                                    
+                                                    ui.add_space(50.0);
+                                                    ui.label("durée minimum d'un cours: ");
+
+                                                    let mut nb_heure =
+                                                        match self.new_duree_minimum.get(&self.selected_filiere_id) {
+                                                            Some(duree) => duree.clone(),
+                                                            None => String::new()
+                                                        };                           
+                                                    let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
+                                                    self.new_duree_minimum.insert(self.selected_filiere_id, nb_heure.clone() );
+                                                    if response_nb_heure.lost_focus() {
+                                                        match self.new_duree_minimum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                                            Ok(nombre) => {
+                                                                if nombre > 0 {
+                                                                    self.duree_minimum.insert(self.selected_filiere_id, Some(nombre));
+                                                                } else {
+                                                                    self.new_duree_minimum.clear();
+                                                                    self.duree_minimum.insert(self.selected_filiere_id, Some(0));
+                                                                }  
+                                                            },
+                                                            Err(_) => {
+                                                                self.new_duree_minimum.clear();
+                                                                self.duree_minimum.insert(self.selected_filiere_id, Some(0));
+                                                            }
+                                                        }
+                                                    }
+                                                        
+
+                                                    ui.end_row();
+
+
+                                                    ui.add_space(50.0);
+                                                    ui.label("durée maximum d'un cours: ");
+                                                
+                                                    let mut nb_heure =
+                                                        match self.new_duree_maximum.get(&self.selected_filiere_id) {
+                                                            Some(duree) => duree.clone(),
+                                                            None => String::new()
+                                                        };                           
+                                                    let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
+                                                    self.new_duree_maximum.insert(self.selected_filiere_id, nb_heure.clone() );
+                                                    if response_nb_heure.lost_focus() {
+                                                        match self.new_duree_maximum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                                            Ok(nombre) => {
+                                                                if nombre > 0 {
+                                                                    self.duree_maximum.insert(self.selected_filiere_id, Some(nombre));
+                                                                } else {
+                                                                    self.new_duree_maximum.clear();
+                                                                    self.duree_maximum.insert(self.selected_filiere_id, Some(0));
+                                                                }  
+                                                            },
+                                                            Err(_) => {
+                                                                self.new_duree_maximum.clear();
+                                                                self.duree_maximum.insert(self.selected_filiere_id, Some(0));
+                                                            }
+                                                        }
+                                                    }
+
+                                                    ui.end_row();
+
+
+                                                    ui.add_space(50.0);
+                                                    let mut en_groupe =
+                                                        match self.selected_en_groupe.get(&self.selected_filiere_id) {
+                                                            Some(groupe) => *groupe,
+                                                            None => false
+                                                        };
+
+                                                    if ui.checkbox(&mut en_groupe, format!("Cours en groupe?")).changed(){
+                                                        self.selected_en_groupe.insert(self.selected_filiere_id, en_groupe); 
+                                                    }
+
+                                                    if *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false) {
+                                                        let response_nb_groupe = ui.text_edit_singleline(&mut self.new_nb_groupe);
+                                                        if response_nb_groupe.lost_focus() {
+                                                            match self.new_nb_groupe.parse::<usize>() {
+                                                                Ok(nombre) => {
+                                                                    if nombre > 0 {
+                                                                        self.nb_groupe.insert(self.selected_filiere_id, Some(nombre));
+                                                                    } else {
+                                                                        self.new_nb_groupe.clear();
+                                                                    }  
+                                                                },
+                                                                Err(_) => {
+                                                                    self.new_nb_groupe.clear();
+                                                                }
+                                                            }
+                                                        }
+                                                    }else{
+                                                        self.nb_groupe.insert(self.selected_filiere_id, Some(1));
+                                                        self.new_nb_groupe.clear();
+                                                    }
+                                                            
+                                                    let mut en_groupe_inter =
+                                                        match self.selected_en_groupe_interclasse.get(&self.selected_filiere_id) {
+                                                            Some(groupe) => *groupe,
+                                                            None => false
+                                                        };
+
+                                                    if ui.checkbox(&mut en_groupe_inter, format!("Cours interclasse?")).changed(){
+                                                        self.selected_en_groupe_interclasse.insert(self.selected_filiere_id, en_groupe_inter);
+                                                    }
+
+                                                    ui.end_row();
+                                                        
+                                                    ui.add_space(50.0);
+                                                    ui.label("Liste des semaines auxquelles l'ajouter: ");
+                                                
+                                                    egui::CollapsingHeader::new("Selection des semaines")
+                                                        .show(ui, |ui| {
+                                                            let options: Vec<usize> = 
+                                                                            self.semaines.clone()//.iter()
+                                                                            .keys()
+                                                                            .filter(|(id_filiere,_i)| {*id_filiere == self.selected_filiere_id})
+                                                                            .map(|(_id_filiere, i)| *i)
+                                                                            .collect();
+                                                            
+                                                            ui.vertical(|ui| {     
+                                                                egui::ScrollArea::both() 
+                                                                .id_source(1)
+                                                                .auto_shrink([true, true])   
+                                                                .show(ui, |ui| {  
+                                                                    
+                                                                    let mut i: usize = 0;
+                                                                    let mut selected = match self.selected_all.get(&self.selected_filiere_id){
+                                                                        Some(select) => *select,
+                                                                        None => false,
+                                                                    };
+                                                                    
+                                                                    if ui.checkbox(&mut selected, format!("Toutes")).changed() {
+                                                                        self.selected_all.insert(self.selected_filiere_id, selected);
+                                                                        for (_cle,option) in options.iter().enumerate(){
+                                                                            if selected{
+                                                                                self.selected_semaines.insert((self.selected_filiere_id, i),*option);   
+                                                                            }else {
+                                                                                self.selected_semaines.remove(&(self.selected_filiere_id, i));
+                                                                            }
+                                                                            i += 1 ;
+                                                                        }
+                                                                    }
+
+                                                                    i = 0;
+                                                                    for (_cle,option) in options.iter().enumerate(){
+                                                                        let mut selected = self.selected_semaines.contains_key(&(self.selected_filiere_id, i));
+                                                                        if ui.checkbox(&mut selected, format!("Semaine {:}",i)).changed() {
+                                                                            if selected {
+                                                                                self.selected_semaines.insert((self.selected_filiere_id, i), *option);
+                                                                            } else {
+                                                                                self.selected_semaines.remove(&(self.selected_filiere_id, i));
+                                                                                self.selected_all.insert(self.selected_filiere_id, false);
+                                                                            }
+                                                                        }
+                                                                        i += 1 ;
+                                                                    }
+
+                                                                });
+                                                            });
+                                                            
+                                            
+                                                    }); 
+                                                    ui.end_row();
+                                                    ui.add_space(10.0);
+                                                    ui.end_row(); 
+                                                });
+     
+ 
                                     });
-                        });
 
-                        let i : usize = 0;
-                        let ajout_matiere = ui.button("Ajouter").clicked() 
-                            && self.liste_selected_matiere.contains_key(&self.selected_filiere_id)
-                            && self.nb_heure.get(&self.selected_filiere_id).unwrap_or(&Some(i)) > &Some(i);
+                                    columns[2].allocate_ui_with_layout(
+                                        Vec2::new(width/10.0, 10.0),
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| 
+                                        {
+                                            egui::Grid::new("Grid113")
+                                                .num_columns(2)
+                                                .min_col_width(150.0)
+                                                //.striped(true)
+                                                .show(ui, |ui| {
+                                                    
+                                                    ui.label("Ajout d'une option: ");
+                                                    
+                                                    let mut nom_option: String =
+                                                    match self.new_nom_option.get(&self.selected_filiere_id) {
+                                                        Some(nom) => nom.clone(),
+                                                        None => "".to_string(),
+                                                    };   
 
-                        if ajout_matiere {   
+                                                                
+                                                    let response_nom_option = ui.text_edit_singleline(&mut nom_option);
+                                                    self.new_nom_option.insert(self.selected_filiere_id, nom_option.clone() );
+                                                    
+                                                    if response_nom_option.lost_focus() {
+                                                        match self.new_nom_option.get(&self.selected_filiere_id) {
+                                                            Some(nom) => {
+                                                                if nom.clone().is_empty()  {
+                                                                }
+                                                                else if !self.nom_option.contains_key(&(self.selected_filiere_id, nom.clone())){
+                                                                    self.nom_option.insert((self.selected_filiere_id, nom.clone()), nom.clone()); 
+                                                                }
+                                                            },
+                                                            None => {
+                                                            },
+                                                        };
+                                                    }
+                                                    ui.add_space(150.0);
+                                                });
+                                            });
+                            
+
+                                    columns[0].allocate_ui_with_layout(
+                                        Vec2::new(width/10.0, 10.0),
+                                        egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                                        |ui| 
+                                        {
+                                            ui.add_space(50.0);
+                                            let i : usize = 0;
+                                            let ajout_matiere = ui.button("Ajouter").clicked() 
+                                                && self.liste_selected_matiere.contains_key(&self.selected_filiere_id)
+                                                && self.nb_heure.get(&self.selected_filiere_id).unwrap_or(&Some(i)) > &Some(i);
+                                            self.ajout_matiere = ajout_matiere;
+                                        });
+                                        
+                                                            
+
+                                });
+                            });
+
+                        }
+                 
+
+                    //SELECTION DES INFORMATIONS SUR LA MATIERE A AJOUTER
+                    
+                        
+
+                    let areat_tableau = egui::Area::new("area_tableau")
+                    .fixed_pos(pos2(
+                    available_rect.min.x + (available_rect.width() * 0.05), // 5% de marge
+                    available_rect.min.y + (available_rect.height() * 0.05) // 5% de marge
+                ))
+                //.constrain_to(custom_region)
+                .anchor(Align2::LEFT_BOTTOM,egui::vec2(0.0, -25.0)) // Ancrage au coin inférieur gauche de l'Area
+                .pivot(Align2::LEFT_BOTTOM)
+                .show(ctx, |ui| {
+                        if self.ajout_matiere {   
+                            self.ajout_matiere = false;
                             //SAUVEGARDE DES MATIERE AJOUTER A CHAQUE FILIERE     
                             let nb_groupe = match self.nb_groupe.get(&self.selected_filiere_id) {
                                 Some(Some(nb)) => nb,
@@ -514,7 +771,10 @@ impl ProgrammeWindow {
                         
                         
                         // AFFICHAGE DES MATIERES AJOUTEES A LA SEMAINE ET A LA FILIERE SELECTIONNEES
-                        egui::ScrollArea::both().show(ui, |ui| {
+                        egui::ScrollArea::both()
+                        .id_source(2)
+                        .auto_shrink([true, true])
+                        .show(ui, |ui| {
                             egui::Grid::new("tableau")
                                 .num_columns(8)
                                 .striped(true)
@@ -580,16 +840,11 @@ impl ProgrammeWindow {
                                     }
                                 });
                         });
-
-
-
-
-
-
-
-                    }
-
                 });
+                   // }
+                    
+            });
+            
     }
 }
                 
