@@ -23,7 +23,7 @@ fn main() -> eframe::Result<()> {
     //let native_options = eframe::NativeOptions::default();
     let options = eframe::NativeOptions {
         window_builder: Some(Box::new(|builder| {
-            builder.with_min_inner_size(vec2(700.0, 300.0))
+            builder.with_min_inner_size(vec2(700.0, 500.0))
         })),
         // Autres options...
         ..Default::default()

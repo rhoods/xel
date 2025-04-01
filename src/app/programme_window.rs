@@ -1,7 +1,7 @@
 use eframe::egui::{self, Label, Response, pos2, vec2, Rect};
-//use std::cmp;
+use std::cmp;
 use std::sync::{Arc, Mutex};
-use egui::{Context, Ui, Color32, Align2, Frame, Vec2};
+use egui::{Context, Ui, Color32, Align2, Frame, Vec2,Rounding, Stroke};
 use std::collections::{HashMap, HashSet};
 use crate::struc::assignation::Groupe;
 use crate::struc::matiere::Matiere;
@@ -390,320 +390,376 @@ impl ProgrammeWindow {
                     pos2(500.0, 400.0)
                 );
                 
-                /*egui::ScrollArea::both() // Activer le défilement vertical et horizontal
-                    .id_source(0)
-                    .auto_shrink([true, true]) // Permet à la zone de se rétrécir horizontalement, mais de ne pas se rétrécir verticalement
-                    .show(ui, |ui| {*/
-                   // Créer une Area à cette position
+                
+                   // Créer une Area à cette positionsition
+
                     if self.nb_sem_deja_valid.contains(&self.selected_filiere_id){
                         
-                        let area_matiere = egui::Area::new("saisie_matiere")
-                            .fixed_pos(pos2(
-                                available_rect.min.x + (available_rect.width() * 0.05), // 5% de marge
-                                available_rect.min.y + (available_rect.height() * 0.05) // 5% de marge
-                            ))
-                            //.constrain_to(custom_region)
-                            //.movable(true)
-                            .anchor(Align2::LEFT_TOP,egui::vec2(50.0, 100.0)) // Ancrage au coin inférieur gauche de l'Area
-                            .pivot(Align2::LEFT_TOP)
-                            .show(ctx, |ui| 
-                            {
-                          
-                                    ui.columns(3, |columns| 
-                                        {
-                                            columns[0].allocate_ui_with_layout(
-                                                    Vec2::new(width/10.0, 10.0),
-                                                egui::Layout::left_to_right(egui::Align::LEFT),
-                                                |ui| 
+                        
+                        ui.vertical_centered(|ui|{
+                            let area_matiere = egui::Area::new("saisie_matiere")
+                                .fixed_pos(pos2(
+                                    (available_rect.width() * 0.10), // 5% de marge
+                                    f32::min(150.0,available_rect.height() * 0.20) // 5% de marge
+                                ))
+                                //.constrain_to(custom_region)
+                                //.movable(true)
+                                //.anchor(Align2::LEFT_TOP,egui::vec2(50.0, 100.0)) // Ancrage au coin inférieur gauche de l'Area
+                                //.pivot(Align2::LEFT_TOP)
+                                .show(ctx, |ui| 
+                                {
+                                    
+                                    ui.set_max_width(available_rect.max.x * 0.8);
+
+                                    egui::ScrollArea::both() // Activer le défilement vertical et horizontal
+                                    .id_source(0)
+                                    .auto_shrink([false, true]) // Permet à la zone de se rétrécir horizontalement, mais de ne pas se rétrécir verticalement
+                                    .show(ui, |ui| {
+
+                                    Frame::none()
+                                    .fill(Color32::from_rgb(40, 40, 40)) // Couleur de fond
+                                    .stroke(Stroke::new(1.0, Color32::from_rgb(40, 40, 40))) // Bordure
+                                    .rounding(Rounding::same(8.0)) // Coins arrondis
+                                    .inner_margin(20.0) // Marge intérieure
+                                    //.outer_margin(-50.0)
+                                    .show(ui, |ui| {
+                                        ui.columns(1, |columns| 
                                             {
-
-                                                egui::Grid::new("Grid111")
-                                                .num_columns(2)
-                                                .min_col_width(150.0)
-                                                //.striped(true)
-                                                .show(ui, |ui| 
+                                                
+                                                columns[0].allocate_ui_with_layout(
+                                                        Vec2::new(width/3.0, 15.0),
+                                                    egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                                                    |ui| 
                                                 {
-                                                    ui.add_space(50.0);
-                                                    ui.label("Ajout d'une matière: ");
-                                                    
-                                                    self.selected_matiere = 
-                                                        match self.liste_selected_matiere.get(&self.selected_filiere_id) {
-                                                            Some(matiere) => matiere.get_name(),
-                                                            None => String::new()
-                                                        };
-                                                            
-                                                    egui::ComboBox::from_id_source("Matieres")
-                                                        .selected_text(&self.selected_matiere)
-                                                        .show_ui(ui, |ui| 
-                                                        {
-                                                            for  (id,matiere) in self.matieres.iter() {
-                                                                //println!("{:?}",matiere.get_room_type());
-                                                                if ui.selectable_label(self.selected_matiere == matiere.get_name(), matiere.get_name()).clicked() {
-                                                                    self.selected_matiere = (matiere.get_name()).to_string();
-                                                                    //self.selected_matiere_id = *id;
-                                                                    self.liste_selected_matiere.insert(self.selected_filiere_id, Arc::clone(matiere));
-                                                                }
-                                                            }
-                                                        });
+                                                    let available_width = ui.available_width().max(0.0);
+                                                    ui.set_max_width(available_width.max(200.0));
 
-                                                    ui.end_row();
-                                                    
-                                                    ui.add_space(50.0);
-                                                    ui.label("Nombre d'heures: ");
-                                                    
-                                                            let mut nb_heure =
-                                                                    match self.new_nb_heure.get(&self.selected_filiere_id) {
-                                                                        Some(heure) => heure.clone(),
-                                                                        None => String::new()
-                                                                    };                           
-                                                                let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
-                                                                self.new_nb_heure.insert(self.selected_filiere_id, nb_heure.clone() );
-                                                                if response_nb_heure.lost_focus() {
-                                                                    match self.new_nb_heure.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
-                                                                        Ok(nombre) => {
-                                                                            if nombre > 0 {
-                                                                                self.nb_heure.insert(self.selected_filiere_id, Some(nombre));
-                                                                            } else {
-                                                                                self.new_nb_heure.clear();
-                                                                                self.nb_heure.insert(self.selected_filiere_id, Some(0));
-                                                                            }  
-                                                                        },
-                                                                        Err(_) => {
-                                                                            self.new_nb_heure.clear();
-                                                                            self.nb_heure.insert(self.selected_filiere_id, Some(0));
-                                                                        }
+                                                    egui::Grid::new("Grid111")
+                                                    .num_columns(2)
+                                                    .min_col_width(175.0)
+                                                    //.striped(true)
+                                                    .show(ui, |ui| 
+                                                    {
+                                                        
+                                                        ui.add_space(width);
+                                                        //ui.add_space(50.0);
+                                                        ui.label("Ajout d'une matière: ");
+                                                        
+                                                        self.selected_matiere = 
+                                                            match self.liste_selected_matiere.get(&self.selected_filiere_id) {
+                                                                Some(matiere) => matiere.get_name(),
+                                                                None => String::new()
+                                                            };
+                                                                
+                                                        let mat_liste = egui::ComboBox::from_id_source("Matieres")
+                                                            .selected_text(&self.selected_matiere)
+                                                            .show_ui(ui, |ui| 
+                                                            {
+                                                                for  (id,matiere) in self.matieres.iter() {
+                                                                    //println!("{:?}",matiere.get_room_type());
+                                                                    if ui.selectable_label(self.selected_matiere == matiere.get_name(), matiere.get_name()).clicked() {
+                                                                        self.selected_matiere = (matiere.get_name()).to_string();
+                                                                        //self.selected_matiere_id = *id;
+                                                                        self.liste_selected_matiere.insert(self.selected_filiere_id, Arc::clone(matiere));
                                                                     }
                                                                 }
-                                                    ui.end_row();
-
-                                                                    
-                                                    ui.add_space(50.0);
-                                                    ui.label("durée minimum d'un cours: ");
-
-                                                    let mut nb_heure =
-                                                        match self.new_duree_minimum.get(&self.selected_filiere_id) {
-                                                            Some(duree) => duree.clone(),
-                                                            None => String::new()
-                                                        };                           
-                                                    let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
-                                                    self.new_duree_minimum.insert(self.selected_filiere_id, nb_heure.clone() );
-                                                    if response_nb_heure.lost_focus() {
-                                                        match self.new_duree_minimum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
-                                                            Ok(nombre) => {
-                                                                if nombre > 0 {
-                                                                    self.duree_minimum.insert(self.selected_filiere_id, Some(nombre));
-                                                                } else {
-                                                                    self.new_duree_minimum.clear();
-                                                                    self.duree_minimum.insert(self.selected_filiere_id, Some(0));
-                                                                }  
-                                                            },
-                                                            Err(_) => {
-                                                                self.new_duree_minimum.clear();
-                                                                self.duree_minimum.insert(self.selected_filiere_id, Some(0));
-                                                            }
-                                                        }
-                                                    }
-                                                        
-
-                                                    ui.end_row();
+                                                            }).response;
 
 
-                                                    ui.add_space(50.0);
-                                                    ui.label("durée maximum d'un cours: ");
-                                                
-                                                    let mut nb_heure =
-                                                        match self.new_duree_maximum.get(&self.selected_filiere_id) {
-                                                            Some(duree) => duree.clone(),
-                                                            None => String::new()
-                                                        };                           
-                                                    let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
-                                                    self.new_duree_maximum.insert(self.selected_filiere_id, nb_heure.clone() );
-                                                    if response_nb_heure.lost_focus() {
-                                                        match self.new_duree_maximum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
-                                                            Ok(nombre) => {
-                                                                if nombre > 0 {
-                                                                    self.duree_maximum.insert(self.selected_filiere_id, Some(nombre));
-                                                                } else {
-                                                                    self.new_duree_maximum.clear();
-                                                                    self.duree_maximum.insert(self.selected_filiere_id, Some(0));
-                                                                }  
-                                                            },
-                                                            Err(_) => {
-                                                                self.new_duree_maximum.clear();
-                                                                self.duree_maximum.insert(self.selected_filiere_id, Some(0));
-                                                            }
-                                                        }
-                                                    }
 
-                                                    ui.end_row();
+                                                        ui.label("durée minimum d'un cours: ");
+                                                        let mut nb_heure =
+                                                                match self.new_duree_minimum.get(&self.selected_filiere_id) {
+                                                                    Some(duree) => duree.clone(),
+                                                                    None => String::new()
+                                                                };    
 
-
-                                                    ui.add_space(50.0);
-                                                    let mut en_groupe =
-                                                        match self.selected_en_groupe.get(&self.selected_filiere_id) {
-                                                            Some(groupe) => *groupe,
-                                                            None => false
-                                                        };
-
-                                                    if ui.checkbox(&mut en_groupe, format!("Cours en groupe?")).changed(){
-                                                        self.selected_en_groupe.insert(self.selected_filiere_id, en_groupe); 
-                                                    }
-
-                                                    if *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false) {
-                                                        let response_nb_groupe = ui.text_edit_singleline(&mut self.new_nb_groupe);
-                                                        if response_nb_groupe.lost_focus() {
-                                                            match self.new_nb_groupe.parse::<usize>() {
+                                                        let response_nb_heure = ui.add(egui::TextEdit::singleline(&mut nb_heure).desired_width(100.0));
+                                                        self.new_duree_minimum.insert(self.selected_filiere_id, nb_heure.clone() );
+                                                        if response_nb_heure.lost_focus() {
+                                                            match self.new_duree_minimum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
                                                                 Ok(nombre) => {
                                                                     if nombre > 0 {
-                                                                        self.nb_groupe.insert(self.selected_filiere_id, Some(nombre));
+                                                                        self.duree_minimum.insert(self.selected_filiere_id, Some(nombre));
                                                                     } else {
-                                                                        self.new_nb_groupe.clear();
+                                                                        self.new_duree_minimum.clear();
+                                                                        self.duree_minimum.insert(self.selected_filiere_id, Some(0));
                                                                     }  
                                                                 },
                                                                 Err(_) => {
-                                                                    self.new_nb_groupe.clear();
+                                                                    self.new_duree_minimum.clear();
+                                                                    self.duree_minimum.insert(self.selected_filiere_id, Some(0));
                                                                 }
                                                             }
                                                         }
-                                                    }else{
-                                                        self.nb_groupe.insert(self.selected_filiere_id, Some(1));
-                                                        self.new_nb_groupe.clear();
-                                                    }
-                                                            
-                                                    let mut en_groupe_inter =
+
+
+                                                        let mut en_groupe =
+                                                            match self.selected_en_groupe.get(&self.selected_filiere_id) {
+                                                                Some(groupe) => *groupe,
+                                                                None => false
+                                                            };
+
+                                                        if ui.checkbox(&mut en_groupe, format!("Cours en groupe?")).changed(){
+                                                            self.selected_en_groupe.insert(self.selected_filiere_id, en_groupe); 
+                                                        }
+
+
+
+                                                        let mut en_groupe_inter =
                                                         match self.selected_en_groupe_interclasse.get(&self.selected_filiere_id) {
                                                             Some(groupe) => *groupe,
                                                             None => false
                                                         };
 
-                                                    if ui.checkbox(&mut en_groupe_inter, format!("Cours interclasse?")).changed(){
-                                                        self.selected_en_groupe_interclasse.insert(self.selected_filiere_id, en_groupe_inter);
-                                                    }
+                                                        if ui.checkbox(&mut en_groupe_inter, format!("Cours interclasse?")).changed(){
+                                                            self.selected_en_groupe_interclasse.insert(self.selected_filiere_id, en_groupe_inter);
+                                                        }
 
-                                                    ui.end_row();
-                                                        
-                                                    ui.add_space(50.0);
-                                                    ui.label("Liste des semaines auxquelles l'ajouter: ");
-                                                
-                                                    egui::CollapsingHeader::new("Selection des semaines")
-                                                        .show(ui, |ui| {
-                                                            let options: Vec<usize> = 
-                                                                            self.semaines.clone()//.iter()
-                                                                            .keys()
-                                                                            .filter(|(id_filiere,_i)| {*id_filiere == self.selected_filiere_id})
-                                                                            .map(|(_id_filiere, i)| *i)
-                                                                            .collect();
-                                                            
-                                                            ui.vertical(|ui| {     
-                                                                egui::ScrollArea::both() 
-                                                                .id_source(1)
-                                                                .auto_shrink([true, true])   
-                                                                .show(ui, |ui| {  
-                                                                    
-                                                                    let mut i: usize = 0;
-                                                                    let mut selected = match self.selected_all.get(&self.selected_filiere_id){
-                                                                        Some(select) => *select,
-                                                                        None => false,
-                                                                    };
-                                                                    
-                                                                    if ui.checkbox(&mut selected, format!("Toutes")).changed() {
-                                                                        self.selected_all.insert(self.selected_filiere_id, selected);
-                                                                        for (_cle,option) in options.iter().enumerate(){
-                                                                            if selected{
-                                                                                self.selected_semaines.insert((self.selected_filiere_id, i),*option);   
-                                                                            }else {
-                                                                                self.selected_semaines.remove(&(self.selected_filiere_id, i));
-                                                                            }
-                                                                            i += 1 ;
-                                                                        }
-                                                                    }
-
-                                                                    i = 0;
-                                                                    for (_cle,option) in options.iter().enumerate(){
-                                                                        let mut selected = self.selected_semaines.contains_key(&(self.selected_filiere_id, i));
-                                                                        if ui.checkbox(&mut selected, format!("Semaine {:}",i)).changed() {
-                                                                            if selected {
-                                                                                self.selected_semaines.insert((self.selected_filiere_id, i), *option);
-                                                                            } else {
-                                                                                self.selected_semaines.remove(&(self.selected_filiere_id, i));
-                                                                                self.selected_all.insert(self.selected_filiere_id, false);
-                                                                            }
-                                                                        }
-                                                                        i += 1 ;
-                                                                    }
-
-                                                                });
-                                                            });
-                                                            
-                                            
-                                                    }); 
-                                                    ui.end_row();
-                                                    ui.add_space(10.0);
-                                                    ui.end_row(); 
-                                                });
-     
+                                                        ui.end_row();
  
-                                    });
 
-                                    columns[2].allocate_ui_with_layout(
-                                        Vec2::new(width/10.0, 10.0),
-                                        egui::Layout::left_to_right(egui::Align::Center),
-                                        |ui| 
-                                        {
-                                            egui::Grid::new("Grid113")
-                                                .num_columns(2)
-                                                .min_col_width(150.0)
-                                                //.striped(true)
-                                                .show(ui, |ui| {
-                                                    
-                                                    ui.label("Ajout d'une option: ");
-                                                    
-                                                    let mut nom_option: String =
-                                                    match self.new_nom_option.get(&self.selected_filiere_id) {
-                                                        Some(nom) => nom.clone(),
-                                                        None => "".to_string(),
-                                                    };   
-
-                                                                
-                                                    let response_nom_option = ui.text_edit_singleline(&mut nom_option);
-                                                    self.new_nom_option.insert(self.selected_filiere_id, nom_option.clone() );
-                                                    
-                                                    if response_nom_option.lost_focus() {
-                                                        match self.new_nom_option.get(&self.selected_filiere_id) {
-                                                            Some(nom) => {
-                                                                if nom.clone().is_empty()  {
+                                                        
+                                                        ui.add_space(width);
+                                                        //ui.add_space(50.0);
+                                                        ui.label("Nombre d'heures: ");
+                                                        
+                                                        let mut nb_heure =
+                                                                match self.new_nb_heure.get(&self.selected_filiere_id) {
+                                                                    Some(heure) => heure.clone(),
+                                                                    None => String::new()
+                                                                };                           
+                                                        let response_nb_heure = ui.add(egui::TextEdit::singleline(&mut nb_heure).desired_width(mat_liste.rect.size()[0]));
+                                                        
+                                                        self.new_nb_heure.insert(self.selected_filiere_id, nb_heure.clone() );
+                                                        if response_nb_heure.lost_focus() {
+                                                            match self.new_nb_heure.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                                                Ok(nombre) => {
+                                                                    if nombre > 0 {
+                                                                        self.nb_heure.insert(self.selected_filiere_id, Some(nombre));
+                                                                    } else {
+                                                                        self.new_nb_heure.clear();
+                                                                        self.nb_heure.insert(self.selected_filiere_id, Some(0));
+                                                                    }  
+                                                                },
+                                                                Err(_) => {
+                                                                    self.new_nb_heure.clear();
+                                                                    self.nb_heure.insert(self.selected_filiere_id, Some(0));
                                                                 }
-                                                                else if !self.nom_option.contains_key(&(self.selected_filiere_id, nom.clone())){
-                                                                    self.nom_option.insert((self.selected_filiere_id, nom.clone()), nom.clone()); 
-                                                                }
-                                                            },
-                                                            None => {
-                                                            },
-                                                        };
-                                                    }
-                                                    ui.add_space(150.0);
-                                                });
-                                            });
-                            
+                                                            }
+                                                        }
 
-                                    columns[0].allocate_ui_with_layout(
-                                        Vec2::new(width/10.0, 10.0),
-                                        egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
-                                        |ui| 
-                                        {
-                                            ui.add_space(50.0);
-                                            let i : usize = 0;
-                                            let ajout_matiere = ui.button("Ajouter").clicked() 
-                                                && self.liste_selected_matiere.contains_key(&self.selected_filiere_id)
-                                                && self.nb_heure.get(&self.selected_filiere_id).unwrap_or(&Some(i)) > &Some(i);
-                                            self.ajout_matiere = ajout_matiere;
-                                        });
-                                        
+
+                                                        ui.label("durée maximum d'un cours: ");
+                                                    
+                                                        let mut nb_heure =
+                                                            match self.new_duree_maximum.get(&self.selected_filiere_id) {
+                                                                Some(duree) => duree.clone(),
+                                                                None => String::new()
+                                                            };                           
+                                                        //let response_nb_heure = ui.text_edit_singleline(&mut nb_heure);
                                                             
+                                                        let response_nb_heure = ui.add(egui::TextEdit::singleline(&mut nb_heure).desired_width(100.0));
+                                                        self.new_duree_maximum.insert(self.selected_filiere_id, nb_heure.clone() );
+                                                        if response_nb_heure.lost_focus() {
+                                                            match self.new_duree_maximum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
+                                                                Ok(nombre) => {
+                                                                    if nombre > 0 {
+                                                                        self.duree_maximum.insert(self.selected_filiere_id, Some(nombre));
+                                                                    } else {
+                                                                        self.new_duree_maximum.clear();
+                                                                        self.duree_maximum.insert(self.selected_filiere_id, Some(0));
+                                                                    }  
+                                                                },
+                                                                Err(_) => {
+                                                                    self.new_duree_maximum.clear();
+                                                                    self.duree_maximum.insert(self.selected_filiere_id, Some(0));
+                                                                }
+                                                            }
+                                                        }
 
+                                                        
+                                                        if *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false) {
+                                                            ui.label("Nombre de groupes: ");
+                                                            let response_nb_groupe = ui.text_edit_singleline(&mut self.new_nb_groupe);
+                                                            if response_nb_groupe.lost_focus() {
+                                                                match self.new_nb_groupe.parse::<usize>() {
+                                                                    Ok(nombre) => {
+                                                                        if nombre > 0 {
+                                                                            self.nb_groupe.insert(self.selected_filiere_id, Some(nombre));
+                                                                        } else {
+                                                                            self.new_nb_groupe.clear();
+                                                                        }  
+                                                                    },
+                                                                    Err(_) => {
+                                                                        self.new_nb_groupe.clear();
+                                                                    }
+                                                                }
+                                                            }
+                                                        }else{
+                                                            self.nb_groupe.insert(self.selected_filiere_id, Some(1));
+                                                            self.new_nb_groupe.clear();
+                                                        }
+                                                        
+
+                                                        ui.end_row();
+                                                        
+                                                        ui.add_space(width);
+                                                        //ui.add_space(50.0);   
+                                                        ui.horizontal(|ui|{
+                                                            ui.label("Options: ");
+                                                            if ui.button("➕ Ajouter").clicked(){
+                                                                println!("ajouter une option à la liste");
+                                                            }
+                                                        }) ;
+                                                        
+                                                        
+                                                        let mut nom_option: String =
+                                                        match self.new_nom_option.get(&self.selected_filiere_id) {
+                                                            Some(nom) => nom.clone(),
+                                                            None => "".to_string(),
+                                                        };   
+
+
+
+                                                        /*let option_liste = egui::ComboBox::from_id_source("Matieres")
+                                                        .selected_text(&self.selected_option)
+                                                        .show_ui(ui, |ui| 
+                                                        {
+                                                            for  (id,option) in self.options.iter() {
+                                                                //println!("{:?}",matiere.get_room_type());
+                                                                if ui.selectable_label(self.selected_option == matiere.get_name(), option.get_name()).clicked() {
+                                                                    self.selected_option = (option.get_name()).to_string();
+                                                                    //self.selected_matiere_id = *id;
+                                                                    self.liste_selected_option.insert(self.selected_filiere_id, Arc::clone(option));
+                                                                }
+                                                            }
+                                                        }).response;*/
+
+
+
+
+                                                        let response_nom_option = ui.add(egui::TextEdit::singleline(&mut nom_option).desired_width(100.0));
+                                                        self.new_nom_option.insert(self.selected_filiere_id, nom_option.clone() );
+                                                        
+                                                        if response_nom_option.lost_focus() {
+                                                            match self.new_nom_option.get(&self.selected_filiere_id) {
+                                                                Some(nom) => {
+                                                                    if nom.clone().is_empty()  {
+                                                                    }
+                                                                    else if !self.nom_option.contains_key(&(self.selected_filiere_id, nom.clone())){
+                                                                        self.nom_option.insert((self.selected_filiere_id, nom.clone()), nom.clone()); 
+                                                                    }
+                                                                },
+                                                                None => {
+                                                                },
+                                                            };
+                                                        }
+                                                        
+                                                        
+
+                                                       
+                                                        //ui.add_space(50.0);
+                                                         
+                                                        ui.end_row();
+                                                        ui.add_space(10.0);
+                                                        ui.end_row(); 
+                                                    });
+        
+    
+                                        });
+
+                                        columns[0].allocate_ui_with_layout(
+                                                Vec2::new(width/3.0, 15.0),
+                                                egui::Layout::left_to_right(egui::Align::Center),
+                                                |ui| 
+                                                {
+
+                                            ui.add_space(width);      
+                                            //ui.add_space(50.0);
+                                            ui.label("Liste des semaines auxquelles l'ajouter: ");
+                                                
+                                            egui::CollapsingHeader::new("Selection des semaines")
+                                            .show(ui, |ui| {
+                                                let options: Vec<usize> = 
+                                                                self.semaines.clone()//.iter()
+                                                                .keys()
+                                                                .filter(|(id_filiere,_i)| {*id_filiere == self.selected_filiere_id})
+                                                                .map(|(_id_filiere, i)| *i)
+                                                                .collect();
+                                                
+                                                ui.vertical(|ui| {     
+                                                    egui::ScrollArea::both() 
+                                                    .id_source(1)
+                                                    .auto_shrink([true, true])   
+                                                    .show(ui, |ui| {  
+                                                        
+                                                        let mut i: usize = 0;
+                                                        let mut selected = match self.selected_all.get(&self.selected_filiere_id){
+                                                            Some(select) => *select,
+                                                            None => false,
+                                                        };
+                                                        
+                                                        if ui.checkbox(&mut selected, format!("Toutes")).changed() {
+                                                            self.selected_all.insert(self.selected_filiere_id, selected);
+                                                            for (_cle,option) in options.iter().enumerate(){
+                                                                if selected{
+                                                                    self.selected_semaines.insert((self.selected_filiere_id, i),*option);   
+                                                                }else {
+                                                                    self.selected_semaines.remove(&(self.selected_filiere_id, i));
+                                                                }
+                                                                i += 1 ;
+                                                            }
+                                                        }
+
+                                                        i = 0;
+                                                        for (_cle,option) in options.iter().enumerate(){
+                                                            let mut selected = self.selected_semaines.contains_key(&(self.selected_filiere_id, i));
+                                                            if ui.checkbox(&mut selected, format!("Semaine {:}",i)).changed() {
+                                                                if selected {
+                                                                    self.selected_semaines.insert((self.selected_filiere_id, i), *option);
+                                                                } else {
+                                                                    self.selected_semaines.remove(&(self.selected_filiere_id, i));
+                                                                    self.selected_all.insert(self.selected_filiere_id, false);
+                                                                }
+                                                            }
+                                                            i += 1 ;
+                                                        }
+
+                                                    });
+                                                });
+                                                
+                                
+                                            });
+                                        });
+
+                                        columns[0].allocate_ui_with_layout(
+                                            Vec2::new(width/3.0, 15.0),
+                                            egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                                            |ui| 
+                                            {
+                                                ui.add_space(50.0);
+                                            });
+
+                                        columns[0].allocate_ui_with_layout(
+                                            Vec2::new(width/3.0, 15.0),
+                                            egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+                                            |ui| 
+                                            {
+                                                //ui.add_space(50.0);
+                                                let i : usize = 0;
+                                                let ajout_matiere = ui.button("Ajouter").clicked() 
+                                                    && self.liste_selected_matiere.contains_key(&self.selected_filiere_id)
+                                                    && self.nb_heure.get(&self.selected_filiere_id).unwrap_or(&Some(i)) > &Some(i);
+                                                self.ajout_matiere = ajout_matiere;
+                                            });
+                     
+
+                                    });
+                                });
+                                });
                                 });
                             });
-
                         }
                  
 
