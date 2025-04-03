@@ -41,6 +41,38 @@ impl MatiereInterClasse {
 }
 
 
+
+#[derive(Clone, Debug)]
+pub struct OptionProgramme{
+    id: usize,
+    name: String,
+    filiere: Arc<Filiere>,
+
+}
+
+impl  OptionProgramme {
+    pub fn new(id:usize, name: String, filiere: Arc<Filiere>) -> Self {
+        Self{
+            id,
+            name,
+            filiere,
+        }
+    }
+
+    pub fn get_id(&self) -> &usize{
+        &self.id
+    }
+
+    pub fn get_name(&self) -> String{
+        self.name.clone()
+    }
+
+    pub fn get_filiere(&self) -> Arc<Filiere>{
+        Arc::clone(&self.filiere)
+    }
+}
+
+
 #[derive(Clone, Debug)]
 pub struct MatiereProg  {
     id: usize,
@@ -52,10 +84,11 @@ pub struct MatiereProg  {
     nb_groupe: usize,
     en_groupe_inter_classe: bool,
     semaine: Arc<Semaine>,
+    option: Arc<OptionProgramme>,
     //liste_classe: Arc<HashMap<usize, Arc<Classe>>>
 }
 impl  MatiereProg  {
-    pub fn  new( id:usize, matiere: Arc<Matiere>, nb_heure:usize, duree_minimum:usize, duree_maximum:usize, en_groupe: bool, nb_groupe: usize, en_groupe_inter_classe: bool,semaine: Arc<Semaine>) -> Self {
+    pub fn  new( id:usize, matiere: Arc<Matiere>, nb_heure:usize, duree_minimum:usize, duree_maximum:usize, en_groupe: bool, nb_groupe: usize, en_groupe_inter_classe: bool,semaine: Arc<Semaine>, option: Arc<OptionProgramme>) -> Self {
         Self {
             id,
             matiere,
@@ -66,6 +99,7 @@ impl  MatiereProg  {
             nb_groupe,
             en_groupe_inter_classe,
             semaine,
+            option
             //liste_classe: Arc::new(HashMap::new()),
         }
     }
@@ -108,6 +142,11 @@ impl  MatiereProg  {
     pub fn get_nb_groupe(&self) -> &usize {
         &self.nb_groupe
     }
+
+    pub fn get_option(&self) -> Arc<OptionProgramme> {
+        Arc::clone(&self.option)
+    }
+
 
 }
 

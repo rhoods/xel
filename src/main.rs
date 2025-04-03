@@ -122,6 +122,16 @@ fn creation_table() -> Result<()> {
         ()
     )?;
 
+    conn.execute("CREATE TABLE IF NOT EXISTS option
+                    (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT,
+                        id_filiere INTEGER,
+                        FOREIGN KEY (id_filiere) REFERENCES Filiere(id) ON DELETE CASCADE
+                    )",
+        ()
+    )?;
+
     conn.execute("CREATE TABLE IF NOT EXISTS MatiereProg
                     (
                         id INTEGER PRIMARY KEY,
@@ -134,8 +144,10 @@ fn creation_table() -> Result<()> {
                         groupe BOOLEAN,
                         nb_groupe INTEGER,
                         interclasse BOOLEAN,
+                        id_option Integer,
                         FOREIGN KEY (id_semaine, id_filiere) REFERENCES Semaine(id_semaine, id_filiere) ON DELETE CASCADE,
-                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE
+                        FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_option) REFERENCES Option(id) ON DELETE CASCADE
                     )",
         ()
     )?;
@@ -173,10 +185,12 @@ fn creation_table() -> Result<()> {
                         id_matiere INTEGER,
                         id_prof INTEGER,
                         id_groupe INTEGER,
+                        id_option INTEGER,
                         FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_prof) REFERENCES Prof(id) ON DELETE CASCADE,
-                        FOREIGN KEY (id_groupe) REFERENCES Groupe(id) ON DELETE CASCADE
+                        FOREIGN KEY (id_groupe) REFERENCES Groupe(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_option) REFERENCES Option(id) ON DELETE CASCADE
                     )",
         ()
     )?;

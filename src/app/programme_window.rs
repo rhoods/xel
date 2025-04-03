@@ -5,7 +5,7 @@ use egui::{Context, Ui, Color32, Align2, Frame, Vec2,Rounding, Stroke};
 use std::collections::{HashMap, HashSet};
 use crate::struc::assignation::Groupe;
 use crate::struc::matiere::Matiere;
-use crate::struc::programme::{MatiereProg, Semaine, MatiereInterClasse}; 
+use crate::struc::programme::{MatiereProg, Semaine, MatiereInterClasse, OptionProgramme}; 
 //use crate::struc::filiere::Filiere;
 //use crate::struc::classe::Classe;
 
@@ -57,8 +57,16 @@ pub struct ProgrammeWindow {
     selected_matiere: String,
     ajout_matiere:bool,
 
+    selected_option: String,
+            
+    liste_selected_option: HashMap<usize,Arc<OptionProgramme>>,
+
     nom_option: HashMap<(usize,String), String>,     
     new_nom_option:   HashMap<usize, String>,  
+    liste_options: HashMap<usize, Arc<OptionProgramme>>,
+    id_option: usize,
+    show_option_window: bool,
+    liste_selected_option_par_matiere: HashMap<(usize,usize), Arc<OptionProgramme>>, //id_filiere, id_matiere
 }
 
 impl  Default for ProgrammeWindow  {
@@ -102,9 +110,17 @@ impl  Default for ProgrammeWindow  {
             liste_selected_matiere: HashMap::new(),
             selected_matiere: String::new(),
 
+            selected_option: String::new(),
+            
+            liste_selected_option: HashMap::new(),
+            liste_selected_option_par_matiere : HashMap::new(),
+
             ajout_matiere: false,
             nom_option: HashMap::new(),
             new_nom_option: HashMap::new(),
+            liste_options: HashMap::new(),
+            id_option: 0,
+            show_option_window : false,
         }
     }
 }
@@ -123,7 +139,11 @@ impl ProgrammeWindow {
         &self.matiere_prog
     }
 
-    pub fn charge(&mut self, groupe: HashMap<usize, Arc<Groupe>>,semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>) {
+    pub fn get_liste_options(&self) -> &HashMap<usize, Arc<OptionProgramme>>{
+        &self.liste_options
+    }
+
+    pub fn charge(&mut self, groupe: HashMap<usize, Arc<Groupe>>,semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>, liste_options: HashMap<usize, Arc<OptionProgramme>>) {
         
             self.groupe = groupe;
             self.matieres =  matieres;
@@ -138,16 +158,73 @@ impl ProgrammeWindow {
             }
             for (id, matiere_prog) in self.matiere_prog.iter(){
                 self.duree_minimum.insert(*id,Some(*matiere_prog.get_duree_minimum()));
-            }
-            for (id, matiere_prog) in self.matiere_prog.iter(){
                 self.duree_maximum.insert(*id,Some(*matiere_prog.get_duree_maximum()));
             }
 
+            self.liste_options = liste_options;
+
+            for (id, matiere_prog) in self.matiere_prog.iter(){   
+                let id_filiere = matiere_prog.get_semaine().get_filiere().get_id();
+                let id_matiere = *matiere_prog.get_matiere().get_id();
+                let option = matiere_prog.get_option();
+                
+                self.liste_selected_option_par_matiere.insert((id_filiere, id_matiere) , Arc::clone(&option));
+                self.nom_option.insert((self.selected_filiere_id, option.get_name()),  option.get_name());
+            }
+            
+
+            
 
     }
 
+
+
+    pub fn fenetre_ajout_option(&mut self, ctx: &egui::Context){
+
+            egui::Window::new("Saisie d'une option")
+                .current_pos(pos2(50.0,50.0))
+                .show(ctx, |ui| {
+                    //while reste_ici{
+                    ui.vertical(|ui|{
+                        let mut nom_option: String =
+                        match self.new_nom_option.get(&self.selected_filiere_id) {
+                            Some(nom) => nom.clone(),
+                            None => "".to_string(),
+                        };
+                        
+                        ui.horizontal(|ui|{
+                            ui.label("nom de l'option");
+                            let response_nom_option = ui.add(egui::TextEdit::singleline(&mut nom_option).desired_width(100.0));
+                            self.new_nom_option.insert(self.selected_filiere_id, nom_option.clone() );
+                        });
+
+                        ui.horizontal(|ui|{
+                            if ui.button("Valider").clicked(){
+                                if !self.nom_option.contains_key(&(self.selected_filiere_id, nom_option.clone())){
+                                    let filiere = self.filieres.get(&self.selected_filiere_id).unwrap();
+                                    self.liste_options.insert(self.id_option, Arc::new(OptionProgramme::new(self.id_option,nom_option.clone(),Arc::clone(filiere))));
+                                    self.nom_option.insert((self.selected_filiere_id, nom_option.clone()), nom_option.clone());
+                                    self.show_option_window = false;
+                                }
+                            }
+                            if ui.button("Annuler").clicked(){
+                                self.show_option_window = false;
+                            }
+                        });
+                    });
+            });
+        
+    }
+
+
+
+
+
+
     pub fn build(&mut self, ctx: &egui::Context) 
     {
+        
+        
         //egui::TopBottomPanel::top("onglets_filiere") //::new("Création des programmes")
         match self.select_matiere_prog_remove_id {
             Some(id) => {  
@@ -194,81 +271,34 @@ impl ProgrammeWindow {
         self.id_groupe = *self.groupe.keys().max().unwrap_or(&0) + 1;
         self.id_matiere_prog = self.matiere_prog.keys().max().unwrap_or(&0) + 1;
   
+        
+        self.id_option = *self.liste_options.keys().max().unwrap_or(&0) + 1; 
+        let mut init_option: HashSet<usize> = HashSet::new();
+        for (cle, option) in self.liste_options.iter(){
+            if option.get_name() == "Commun" {
+                init_option.insert(option.get_filiere().get_id());
+            }
+        }
+        for( cle, filiere) in self.filieres.iter(){
+            match init_option.get(&filiere.get_id()){
+                Some(id_fliere) => {},
+                None => {
+                            self.liste_options.insert(self.id_option, Arc::new(OptionProgramme::new(self.id_option,"Commun".to_string(),Arc::clone(filiere)))); 
+                            self.id_option += 1;
+                        },
+            }
+        }
 
-        /*let frame = egui::Frame {
-            stroke: egui::Stroke::new(1.0, egui::Color32::GRAY),
-            inner_margin: egui::style::Margin::same(10.0),
-            fill: egui::Color32::from_rgb(13, 26, 53),
-            ..Default::default()
-        };*/
+        
+        if self.show_option_window{
+            self.fenetre_ajout_option(ctx);
+        }
 
-        /*egui::SidePanel::left("panneau_gauche")
-        //.frame(frame)
-        .show(ctx, |ui| {
-            ui.vertical(|ui| {
-                //ajoute le prof si on clique sur valider ou sur la touche entrer
-                ui.add_space(10.0);
-                ui.heading("Filières");
-                ui.separator();
-                for (id_filiere, filiere) in self.filieres.iter() {
-                    if ui.selectable_label(&self.selected_filiere_id == id_filiere,format!("{:}", filiere.get_name())).clicked() {                                  
-                        self.selected_filiere_id = *id_filiere;
-                        if !self.nb_sem.get(&self.selected_filiere_id).is_none() {
-                            self.new_nb_sem = self.nb_sem.get(&self.selected_filiere_id).unwrap().unwrap().to_string();
-                        }
-                    }
-                }
-            });
-        });*/
-
-        /*egui::SidePanel::right("panneau_droite")
-        //.frame(frame)
-        .show(ctx, |ui| {
-            ui.vertical(|ui| {
-                //ajoute le prof si on clique sur valider ou sur la touche entrer
-                ui.add_space(10.0);
-                ui.heading("Options");
-                ui.separator();
-                egui::Grid::new("Grid112")
-                    .num_columns(1)
-                    .min_col_width(100.0)
-                    //.striped(true)
-                    .show(ui, |ui| {
-                        
-                        ui.label("Ajout d'une option: ");
-                        ui.end_row();
-                        let mut nom_option =
-                        match self.new_nom_option.get(&self.selected_filiere_id) {
-                            Some(nom) => nom.clone().unwrap(),
-                            None => String::new()
-                        };   
-
-                                        
-                        let response_nom_option = ui.text_edit_singleline(&mut nom_option);
-                        self.new_nom_option.insert(self.selected_filiere_id, Some(nom_option.clone()) );
-                        if response_nom_option.lost_focus() {
-                            match self.new_nom_option.get(&self.selected_filiere_id) {
-                                Some(nom) => {
-                                    if !self.nom_option.contains_key(&(self.selected_filiere_id, nom.clone().unwrap())){
-                                        self.nom_option.insert((self.selected_filiere_id, nom.clone().unwrap()), nom.clone().unwrap());
-                                    } else {
-                                        self.new_nom_option.clear();
-                                    }  
-                                },
-                                None => {
-                                    self.new_nom_option.clear();
-                                }
-                            }
-                        }
-
-                        
-                    });
-            });
-        });*/
-
+        
         egui::CentralPanel::default()
             .show(ctx, |ui| {
                 //ui.vertical_centered(|ui| {
+                
                     
                 ui.horizontal(|ui| {
                     for (id_filiere, filiere) in self.filieres.iter() {
@@ -280,6 +310,7 @@ impl ProgrammeWindow {
                         }
                     }
                 });
+
                     //ui.end_row();
                    let screen_rect = ctx.screen_rect();
                    let available_rect = screen_rect;
@@ -396,7 +427,7 @@ impl ProgrammeWindow {
                     if self.nb_sem_deja_valid.contains(&self.selected_filiere_id){
                         
                         
-                        ui.vertical_centered(|ui|{
+                       // ui.vertical_centered(|ui|{
                             let area_matiere = egui::Area::new("saisie_matiere")
                                 .fixed_pos(pos2(
                                     (available_rect.width() * 0.10), // 5% de marge
@@ -418,7 +449,7 @@ impl ProgrammeWindow {
 
                                     Frame::none()
                                     .fill(Color32::from_rgb(40, 40, 40)) // Couleur de fond
-                                    .stroke(Stroke::new(1.0, Color32::from_rgb(40, 40, 40))) // Bordure
+                                    .stroke(Stroke::new(1.0, Color32::from_rgb(100, 100, 100))) // Bordure
                                     .rounding(Rounding::same(8.0)) // Coins arrondis
                                     .inner_margin(20.0) // Marge intérieure
                                     //.outer_margin(-50.0)
@@ -606,59 +637,43 @@ impl ProgrammeWindow {
                                                         
                                                         ui.add_space(width);
                                                         //ui.add_space(50.0);   
+                                                        
+
+                                                        
+
+                                                        
                                                         ui.horizontal(|ui|{
                                                             ui.label("Options: ");
                                                             if ui.button("➕ Ajouter").clicked(){
-                                                                println!("ajouter une option à la liste");
+                                                                self.show_option_window = true;
                                                             }
                                                         }) ;
                                                         
-                                                        
-                                                        let mut nom_option: String =
-                                                        match self.new_nom_option.get(&self.selected_filiere_id) {
-                                                            Some(nom) => nom.clone(),
-                                                            None => "".to_string(),
-                                                        };   
-
-
-
-                                                        /*let option_liste = egui::ComboBox::from_id_source("Matieres")
+                                                        //pour que ca ne reste pas sur la selection en cours lorsque l'on change de filiere
+                                                        if let Some(select) = self.liste_selected_option.get(&self.selected_filiere_id){
+                                                            self.selected_option = select.get_name();
+                                                        }else{
+                                                            self.selected_option = String::new();
+                                                        }
+                                                         
+                                                        let option_liste = egui::ComboBox::from_id_source("Options")
                                                         .selected_text(&self.selected_option)
                                                         .show_ui(ui, |ui| 
                                                         {
-                                                            for  (id,option) in self.options.iter() {
-                                                                //println!("{:?}",matiere.get_room_type());
-                                                                if ui.selectable_label(self.selected_option == matiere.get_name(), option.get_name()).clicked() {
+                                                            for  (id,option) in self.liste_options.iter() 
+                                                            .filter(|(id,option)|
+                                                                {
+                                                                    self.selected_filiere_id == option.get_filiere().get_id()
+                                                                })
+                                                            {
+                                                                
+                                                                if ui.selectable_label(self.selected_option == option.get_name(), option.get_name()).clicked() {
                                                                     self.selected_option = (option.get_name()).to_string();
-                                                                    //self.selected_matiere_id = *id;
                                                                     self.liste_selected_option.insert(self.selected_filiere_id, Arc::clone(option));
                                                                 }
                                                             }
-                                                        }).response;*/
+                                                        }).response;
 
-
-
-
-                                                        let response_nom_option = ui.add(egui::TextEdit::singleline(&mut nom_option).desired_width(100.0));
-                                                        self.new_nom_option.insert(self.selected_filiere_id, nom_option.clone() );
-                                                        
-                                                        if response_nom_option.lost_focus() {
-                                                            match self.new_nom_option.get(&self.selected_filiere_id) {
-                                                                Some(nom) => {
-                                                                    if nom.clone().is_empty()  {
-                                                                    }
-                                                                    else if !self.nom_option.contains_key(&(self.selected_filiere_id, nom.clone())){
-                                                                        self.nom_option.insert((self.selected_filiere_id, nom.clone()), nom.clone()); 
-                                                                    }
-                                                                },
-                                                                None => {
-                                                                },
-                                                            };
-                                                        }
-                                                        
-                                                        
-
-                                                       
                                                         //ui.add_space(50.0);
                                                          
                                                         ui.end_row();
@@ -758,23 +773,25 @@ impl ProgrammeWindow {
                                     });
                                 });
                                 });
-                                });
-                            });
-                        }
+                                }).response;
+                            //});
+                        
                  
 
                     //SELECTION DES INFORMATIONS SUR LA MATIERE A AJOUTER
                     
-                        
-
-                    let areat_tableau = egui::Area::new("area_tableau")
+                //dbg!(&area_matiere.rect.size());
+                //dbg!(&area_matiere.rect.max.y);
+                let y = area_matiere.rect.max.y;
+                
+                let areat_tableau = egui::Area::new("area_tableau")
                     .fixed_pos(pos2(
                     available_rect.min.x + (available_rect.width() * 0.05), // 5% de marge
-                    available_rect.min.y + (available_rect.height() * 0.05) // 5% de marge
+                    y + 20.0 // 5% de marge
                 ))
                 //.constrain_to(custom_region)
-                .anchor(Align2::LEFT_BOTTOM,egui::vec2(0.0, -25.0)) // Ancrage au coin inférieur gauche de l'Area
-                .pivot(Align2::LEFT_BOTTOM)
+                //.anchor(Align2::LEFT_BOTTOM,egui::vec2(0.0, -25.0)) // Ancrage au coin inférieur gauche de l'Area
+                //.pivot(Align2::LEFT_BOTTOM)
                 .show(ctx, |ui| {
                         if self.ajout_matiere {   
                             self.ajout_matiere = false;
@@ -797,7 +814,8 @@ impl ProgrammeWindow {
                                                              *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false),
                                                              *nb_groupe,
                                                              *self.selected_en_groupe_interclasse.get(&self.selected_filiere_id).unwrap_or(&false), 
-                                                             Arc::clone(semaine)
+                                                             Arc::clone(semaine),
+                                                             Arc::clone(self.liste_selected_option.get(&self.selected_filiere_id).unwrap())
                                                             )));
                                     self.id_matiere_prog += 1;
                                 }
@@ -825,81 +843,120 @@ impl ProgrammeWindow {
                             });
                         });    
                         
-                        
+                        //dbg!(&self.matiere_prog);
                         // AFFICHAGE DES MATIERES AJOUTEES A LA SEMAINE ET A LA FILIERE SELECTIONNEES
                         egui::ScrollArea::both()
                         .id_source(2)
                         .auto_shrink([true, true])
                         .show(ui, |ui| {
-                            egui::Grid::new("tableau")
-                                .num_columns(8)
+
+                            let mut i: usize = 0;
+                            egui::Grid::new("tableau de placement")//option.get_id()
+                                .num_columns(2)
                                 .striped(true)
-                                .spacing((10.0,10.0))
-                                .min_col_width(100.0)
+                                .spacing((20.0,20.0))
+                                .min_col_width(800.0)
                                 .show(ui, |ui| {
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Matiere");
-                                    });
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Nombre d'heure(s)");
-                                    });
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Durée minimum");
-                                    });
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Durée maximum");
-                                    });
-                                     ui.vertical_centered(|ui| {
-                                        ui.label("Cours en groupe?");
-                                    });
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Nombre de groupe(s)");
-                                    }); 
-                                    ui.vertical_centered(|ui| {
-                                        ui.label("Cours inter-classe?");
-                                    });
-                                    ui.label(" ");
-                                    ui.end_row();
+
+                                for (id, option) in self.liste_options.iter()
+                                    .filter(|(id, option)|{option.get_filiere().get_id() == self.selected_filiere_id})
+                                {
                                     
-                                    for (i, matiere) in self.matiere_prog.iter()
-                                        .filter(|(id, matiere_prog)| {matiere_prog.get_semaine().get_filiere().get_id() == self.selected_filiere_id 
-                                        && Some(matiere_prog.get_semaine().get_id()) == self.selected_semaine_onglet.get(&self.selected_filiere_id)
-                                        }) 
-                                    {
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(matiere.get_matiere().get_name());
+                                    ui.vertical(|ui|{
+                                       
+                                        ui.heading(option.get_name());
+                                     
+                                        egui::Grid::new(option.get_id())//option.get_id()
+                                        .num_columns(8)
+                                        .striped(true)
+                                        .spacing((10.0,10.0))
+                                        .min_col_width(100.0)
+                                        .show(ui, |ui| {
+                                                //ui.heading(option.get_name());
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Matiere");
+                                                });
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Nombre d'heure(s)");
+                                                });
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Durée minimum");
+                                                });
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Durée maximum");
+                                                });
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Cours en groupe?");
+                                                });
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Nombre de groupe(s)");
+                                                }); 
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label("Cours inter-classe?");
+                                                });
+                                                ui.label(" ");
+                                                ui.end_row();
+
+                                                
+                                                for (i, matiere) in self.matiere_prog.iter()
+                                                    .filter(|(id, matiere_prog)| 
+                                                    {
+                                                        matiere_prog.get_semaine().get_filiere().get_id() == self.selected_filiere_id 
+                                                        && Some(matiere_prog.get_semaine().get_id()) == self.selected_semaine_onglet.get(&self.selected_filiere_id)
+                                                        && matiere_prog.get_option().get_id() == option.get_id()
+                                                    }) 
+                                                {
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(matiere.get_matiere().get_name());
+                                                    });
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(format!("{:}", matiere.get_nb_heure()));
+                                                    });
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(format!("{:}", matiere.get_duree_minimum()));
+                                                    });
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(format!("{:}", matiere.get_duree_maximum()));
+                                                    });
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(format!("{:}", matiere.get_en_groupe().to_string()));
+                                                    });
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(format!("{:}", matiere.get_nb_groupe()));
+                                                    });
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(format!("{:}", matiere.get_en_groupe_inter_classe().to_string()));
+                                                    });
+                                                    ui.horizontal_centered(|ui| {
+                                                        if ui.button("❌").clicked() {
+                                                            self.select_matiere_prog_remove_id = Some(*i);
+                                                        }
+                                                    });                        
+                                                    ui.end_row();
+                                                }
+                                            });
                                         });
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(format!("{:}", matiere.get_nb_heure()));
-                                        });
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(format!("{:}", matiere.get_duree_minimum()));
-                                        });
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(format!("{:}", matiere.get_duree_maximum()));
-                                        });
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(format!("{:}", matiere.get_en_groupe().to_string()));
-                                        });
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(format!("{:}", matiere.get_nb_groupe()));
-                                        });
-                                        ui.vertical_centered(|ui| {
-                                            ui.label(format!("{:}", matiere.get_en_groupe_inter_classe().to_string()));
-                                        });
-                                        ui.horizontal_centered(|ui| {
-                                            if ui.button("❌").clicked() {
-                                                self.select_matiere_prog_remove_id = Some(*i);
+                                            if i%2 > 0{
+                                                ui.end_row();
                                             }
-                                        });                        
-                                        ui.end_row();
-                                    }
-                                });
+                                            i += 1;
+                                        
+                                }
+                                
+                                
+                                
+                            });    
                         });
+
                 });
                    // }
                     
+                }  
             });
+
+        
+                                                                
+            
             
     }
 }

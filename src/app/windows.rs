@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use crate::struc::horaire::{CreneauxEtablissement, TypeCreneau};
 use crate::struc::teacher::{Teacher, Etat};
 //use crate::struc::programme::MatiereProg;
-use crate::struc::{ matiere::Matiere, programme::{Semaine, MatiereProg, MatiereInterClasse}};
+use crate::struc::{ matiere::Matiere, programme::{Semaine, MatiereProg, MatiereInterClasse, OptionProgramme}};
 
 use crate::struc::assignation::{Assignation, Groupe};
 
@@ -114,6 +114,7 @@ pub struct SchedulerApp{
     programme_window: ProgrammeWindow,
     assignation_window: AssignationWindow,
     planning_window: PlanningWindow,
+    liste_options: HashMap<usize, Arc<OptionProgramme>>,
 }
 
 impl  Default for SchedulerApp{
@@ -175,6 +176,7 @@ impl  Default for SchedulerApp{
             programme_window: ProgrammeWindow::default(),
             assignation_window: AssignationWindow::default(),
             planning_window: PlanningWindow::default(),
+            liste_options: HashMap::new(),
             
             
         }
@@ -267,7 +269,6 @@ impl  eframe::App for SchedulerApp {
                         ui.label("Attention, la sauvegarde précédente sera supprimée");  
                         ui.horizontal(|(ui)| {
                             if ui.button("Valider").clicked(){
-                                dbg!(&self.selected_liste_inter_classe);
                                 let reset = self.reset_bdd();
                                 match reset {
                                     Ok(_) => println!("reset bdd termine")
@@ -356,9 +357,10 @@ impl  SchedulerApp {
             self.classes = self.classe_window.get_liste_classe().clone();
     }
     fn show_programs_window(&mut self, ctx: &Context) {
-            self.programme_window.charge(self.groupe.clone(), self.semaines.clone(), self.matieres_prog.clone(), self.filieres.clone(), self.classes.clone(), self.matieres.clone(), self.rooms_types.clone());
+            self.programme_window.charge(self.groupe.clone(), self.semaines.clone(), self.matieres_prog.clone(), self.filieres.clone(), self.classes.clone(), self.matieres.clone(), self.rooms_types.clone(), self.liste_options.clone());
             self.programme_window.build(ctx);
             self.semaines = self.programme_window.get_liste_semaine().clone();
+            self.liste_options = self.programme_window.get_liste_options().clone();
             self.matieres_prog = self.programme_window.get_liste_matiere_prog().clone();
             self.groupe = self.programme_window.get_groupe().clone();
             //dbg!(&self.groupe);
@@ -428,6 +430,11 @@ impl  SchedulerApp {
         let mut insert_matiere = conn.prepare("INSERT INTO Matiere (id, name, id_type_salle) VALUES (?1, ?2, ?3)")?;
         for (cle, matiere) in self.matieres.iter() {
             insert_matiere.execute(rusqlite::params![cle, matiere.get_name(), matiere.get_room_type().get_id()])?;
+        }
+
+        let mut insert_option = conn.prepare("INSERT INTO option (id, name, id_filiere) VALUES (?1, ?2, ?3)")?;
+        for (cle, option) in self.liste_options.iter() {
+            insert_option.execute(rusqlite::params![cle, option.get_name(), option.get_filiere().get_id()])?;
         }
 
         //sauvegarde programme
@@ -621,7 +628,24 @@ impl  SchedulerApp {
         }
 
 
-        let mut recup_matiere_prog = conn.prepare("SELECT id, id_semaine,id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe,nb_groupe, interclasse FROM MatiereProg")?;
+        let mut recup_option =  conn.prepare("SELECT id, name, id_filiere FROM Option")?;
+        let rows = recup_option.query_map([], |row| {
+            let id_option: usize = row.get(0)?;
+            let nom_option: String = row.get(1)?;
+            let id_filiere: usize = row.get(2)?;
+            Ok((id_option, nom_option, id_filiere))
+        })?;
+
+        for row in rows {
+            let (id_option, nom_option, id_filiere) = row?;
+            match self.filieres.get_key_value(&id_filiere) {
+                Some(filiere) => self.liste_options.insert(id_option, Arc::new(OptionProgramme::new(id_option,nom_option, Arc::clone(filiere.1)))),
+                None => None,
+            };
+        }
+
+
+        let mut recup_matiere_prog = conn.prepare("SELECT id, id_semaine,id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe,nb_groupe, interclasse, id_option FROM MatiereProg")?;
         let rows = recup_matiere_prog.query_map([], |row| {
             let id_matiere_prog: usize = row.get(0)?;
             let id_semaine: usize = row.get(1)?;
@@ -633,13 +657,14 @@ impl  SchedulerApp {
             let groupe: bool = row.get(7)?;
             let nb_groupe: usize = row.get(8)?;
             let interclasse: bool = row.get(9)?;
-            Ok((id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse))
+            let id_option: usize = row.get(10)?;
+            Ok((id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse, id_option))
         })?;
 
         for row in rows {
-            let (id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse) = row?;
-            match (self.semaines.get_key_value(&(id_filiere,id_semaine)), self.matieres.get_key_value(&id_matiere) ) {
-                (Some(semaine), Some(matiere)) => self.matieres_prog.insert(id_matiere_prog, Arc::new(MatiereProg::new(id_semaine,Arc::clone(matiere.1), nb_heure, duree_minimum, duree_maximum, groupe,  nb_groupe, interclasse, Arc::clone(semaine.1))), ),
+            let (id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse, id_option) = row?;
+            match (self.semaines.get_key_value(&(id_filiere,id_semaine)), self.matieres.get_key_value(&id_matiere), self.liste_options.get_key_value(&id_option) ) {
+                (Some(semaine), Some(matiere), Some(option)) => self.matieres_prog.insert(id_matiere_prog, Arc::new(MatiereProg::new(id_semaine,Arc::clone(matiere.1), nb_heure, duree_minimum, duree_maximum, groupe,  nb_groupe, interclasse, Arc::clone(semaine.1), Arc::clone(option.1))), ),
                 _ => None,
             };
         }
@@ -662,15 +687,13 @@ impl  SchedulerApp {
         
 
 
-
-
         let mut recup_groupe = conn.prepare("SELECT id, name, id_matiere, id_classe FROM Groupe")?;
         let rows = recup_groupe.query_map([], |row| {
             let id_groupe: usize = row.get(0)?;
             let name: usize = row.get(1)?;
             let id_matiere: usize = row.get(2)?;
             let id_classe: usize = row.get(3)?;
-            Ok((id_groupe,name, id_matiere, id_classe))
+            Ok((id_groupe, name, id_matiere, id_classe))
         })?;
 
         for row in rows {
@@ -681,20 +704,24 @@ impl  SchedulerApp {
             };
         }
 
-        let mut recup_assignement = conn.prepare("SELECT id,  id_classe, id_matiere, id_prof, id_groupe FROM Assignement")?;
+        
+       
+        let mut recup_assignement = conn.prepare("SELECT id,  id_classe, id_matiere, id_prof, id_groupe, id_option FROM Assignement")?;
+      
         let rows = recup_assignement.query_map([], |row| {
             let id_assignement: usize = row.get(0)?;
             let id_classe: usize = row.get(1)?;
             let id_matiere: usize = row.get(2)?;
             let id_prof: usize = row.get(3)?;
             let id_groupe: usize = row.get(4)?;
-            Ok((id_assignement, id_classe, id_matiere, id_prof, id_groupe))
+            let id_option: usize = row.get(5)?;
+            Ok((id_assignement, id_classe, id_matiere, id_prof, id_groupe, id_option))
         })?;
 
         for row in rows {
-            let (id_assignement, id_classe, id_matiere, id_prof, id_groupe) = row?;
-            match (self.matieres.get_key_value(&id_matiere), self.classes.get_key_value(&id_classe), self.teachers.get_key_value(&id_prof), self.groupe.get_key_value(&id_groupe)) {
-                (Some(matiere), Some(classe), Some(prof), Some(groupe)) => self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement, Arc::clone(classe.1), Arc::clone(matiere.1), Arc::clone(groupe.1) , prof.1.clone()))),
+            let (id_assignement, id_classe, id_matiere, id_prof, id_groupe, id_option) = row?;
+            match (self.matieres.get_key_value(&id_matiere), self.classes.get_key_value(&id_classe), self.teachers.get_key_value(&id_prof), self.groupe.get_key_value(&id_groupe), self.liste_options.get_key_value(&id_option)) {
+                (Some(matiere), Some(classe), Some(prof), Some(groupe), Some(option)) => self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement, Arc::clone(classe.1), Arc::clone(matiere.1), Arc::clone(groupe.1) , prof.1.clone(), Arc::clone(option.1)))),
                 _ => None,
             };
         }
@@ -767,6 +794,7 @@ impl  SchedulerApp {
         let mut reset_prof = conn.prepare("DELETE FROM Prof")?;
         let mut reset_matiere_inter = conn.prepare("DELETE FROM MatiereInterClasse")?;
         let mut reset_matiere_prog = conn.prepare("DELETE FROM MatiereProg")?;
+        let mut reset_option = conn.prepare("DELETE FROM Option")?;
         let mut reset_semaine = conn.prepare("DELETE FROM Semaine")?;
         let mut reset_matiere = conn.prepare("DELETE FROM Matiere")?;
         let mut reset_salle = conn.prepare("DELETE FROM Salle")?;
@@ -786,6 +814,8 @@ impl  SchedulerApp {
         conn.execute("VACUUM;", [])?;
         
         reset_matiere_prog.execute(())?;
+        conn.execute("VACUUM;", [])?;
+        reset_option.execute(())?;
         conn.execute("VACUUM;", [])?;
         reset_semaine.execute(())?;
         conn.execute("VACUUM;", [])?;
@@ -866,6 +896,7 @@ impl  SchedulerApp {
             programme_window: self.programme_window.clone(),
             assignation_window: self.assignation_window.clone(),
             planning_window: self.planning_window.clone(),
+            liste_options: self.liste_options.clone(),
         }
     }
 }

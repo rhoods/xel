@@ -1,6 +1,6 @@
 //use std::collections::HashMap;
 
-use crate::struc::programme::{MatiereProg};
+use crate::struc::programme::{MatiereProg,OptionProgramme};
 use crate::struc::matiere::{Matiere};
 use crate::struc::teacher::{Teacher};
 
@@ -11,6 +11,8 @@ use crate::app::room_window::RoomType; //
 
 use crate::app::filiere_window::Classe;
 use std::collections::{HashMap};
+
+//use super::programme::OptionProgramme;
 
 
 #[derive(Clone, Debug)]
@@ -54,17 +56,19 @@ pub struct Assignation  {
     matiere: Arc<Matiere>,
     groupe : Arc<Groupe>,
     prof: Teacher,
+    option: Arc<OptionProgramme>,
 
 }
 
 impl Assignation {
-    pub fn new( id: usize, classe: Arc<Classe>, matiere: Arc<Matiere>, groupe: Arc<Groupe>, prof: Teacher,) -> Self{
+    pub fn new( id: usize, classe: Arc<Classe>, matiere: Arc<Matiere>, groupe: Arc<Groupe>, prof: Teacher,option: Arc<OptionProgramme>,) -> Self{
         Self {
             id,
             matiere,
             classe,
             groupe,
             prof,
+            option,
         }
     }
 

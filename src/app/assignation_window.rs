@@ -243,7 +243,7 @@ impl AssignationWindow {
                                                                                     let id_groupe = *id;
                                                                                     let classe = self.classe.get(&id_classe).unwrap();
                                                                                     let matiere = self.matiere.get(&id_matiere).unwrap();
-
+                                                                                    let option_programme = matiere_prog.get_option();
                                                                                     self.selected_option_id = Some(*id);
                                                                                     self.selected_prof.insert((self.selected_classe_id.unwrap(), *matiere_prog.get_matiere().get_id(), id_groupe), *id_teacher);
                                                                                     self.selected_option.insert((self.selected_classe_id.unwrap(),*matiere_prog.get_matiere().get_id(), id_groupe), option.get_name());
@@ -261,10 +261,10 @@ impl AssignationWindow {
                                                                                         if id_ass.is_ok(){
                                                                                             match id_ass.unwrap() {
                                                                                                 Some(id_assignement) => {
-                                                                                                                                self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement,Arc::clone(classe), Arc::clone(matiere), Arc::clone(groupe), option.clone())));
+                                                                                                                                self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement,Arc::clone(classe), Arc::clone(matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme))));
                                                                                                                                 },
                                                                                                 None => {
-                                                                                                            self.assignement.insert(self.id_assignement, Arc::new(Assignation::new(self.id_assignement,Arc::clone(classe), Arc::clone(&matiere), Arc::clone(groupe), option.clone())));
+                                                                                                            self.assignement.insert(self.id_assignement, Arc::new(Assignation::new(self.id_assignement,Arc::clone(classe), Arc::clone(&matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme))));
                                                                                                             self.id_assignement += 1;
                                                                                                         },
                                                                                             }
