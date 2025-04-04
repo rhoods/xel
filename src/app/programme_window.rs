@@ -3,7 +3,7 @@ use std::cmp;
 use std::sync::{Arc, Mutex};
 use egui::{Context, Ui, Color32, Align2, Frame, Vec2,Rounding, Stroke};
 use std::collections::{HashMap, HashSet};
-use crate::struc::assignation::Groupe;
+use crate::struc::assignation::{Groupe, Assignation};
 use crate::struc::matiere::Matiere;
 use crate::struc::programme::{MatiereProg, Semaine, MatiereInterClasse, OptionProgramme}; 
 //use crate::struc::filiere::Filiere;
@@ -36,6 +36,7 @@ pub struct ProgrammeWindow {
     classes:  HashMap<usize, Arc<Classe>>,
     matieres: HashMap<usize, Arc<Matiere>>,
     salles_type: HashMap<usize, Arc<RoomType>>,
+    assignement :HashMap<usize, Arc<Assignation>>,
     //new_matiere: String,
 
     new_duree_minimum: HashMap<usize,String>,
@@ -67,6 +68,8 @@ pub struct ProgrammeWindow {
     id_option: usize,
     show_option_window: bool,
     liste_selected_option_par_matiere: HashMap<(usize,usize), Arc<OptionProgramme>>, //id_filiere, id_matiere
+    select_option_remove_id: Option<usize>,
+
 }
 
 impl  Default for ProgrammeWindow  {
@@ -82,6 +85,7 @@ impl  Default for ProgrammeWindow  {
             selected_semaine_onglet: HashMap::new(),
             selected_semaines: HashMap::new(),
             matieres: HashMap::new(),
+
             //programmes: HashMap::new(),// HashMap::new()
             groupe: HashMap::new(),
             semaines: HashMap::new(),
@@ -91,7 +95,8 @@ impl  Default for ProgrammeWindow  {
             filieres: HashMap::new(),
             classes:  HashMap::new(),
             salles_type: HashMap::new(),
-            
+            assignement :HashMap::new(),
+
             new_duree_minimum: HashMap::new(),
             duree_minimum: HashMap::new(),
             new_duree_maximum: HashMap::new(),
@@ -121,6 +126,7 @@ impl  Default for ProgrammeWindow  {
             liste_options: HashMap::new(),
             id_option: 0,
             show_option_window : false,
+            select_option_remove_id: None,
         }
     }
 }
@@ -143,7 +149,15 @@ impl ProgrammeWindow {
         &self.liste_options
     }
 
-    pub fn charge(&mut self, groupe: HashMap<usize, Arc<Groupe>>,semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>, liste_options: HashMap<usize, Arc<OptionProgramme>>) {
+    pub fn get_assignement(&self) -> &HashMap<usize, Arc<Assignation>>{
+        &self.assignement
+    }
+
+    pub fn get_matiere_inter_classe(&self) -> &HashMap<usize, Arc<MatiereInterClasse>>{
+        &self.matiere_inter_classe
+    }
+
+    pub fn charge(&mut self, groupe: HashMap<usize, Arc<Groupe>>,semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>, liste_options: HashMap<usize, Arc<OptionProgramme>>,  assignement :HashMap<usize, Arc<Assignation>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, ) {
         
             self.groupe = groupe;
             self.matieres =  matieres;
@@ -168,10 +182,11 @@ impl ProgrammeWindow {
                 let id_matiere = *matiere_prog.get_matiere().get_id();
                 let option = matiere_prog.get_option();
                 
-                self.liste_selected_option_par_matiere.insert((id_filiere, id_matiere) , Arc::clone(&option));
-                self.nom_option.insert((self.selected_filiere_id, option.get_name()),  option.get_name());
+                //self.liste_selected_option_par_matiere.insert((id_filiere, id_matiere) , Arc::clone(&option));
+                self.nom_option.insert((self.selected_filiere_id, option.get_name()),  option.get_name()); //pour ne pas pouvoir saisir de doublons sur les options
             }
             
+            self.assignement = assignement;
 
             
 
@@ -217,6 +232,87 @@ impl ProgrammeWindow {
     }
 
 
+    pub fn supprime_matiere_prog(&mut self, id_matiere_prog: usize){
+        if let Some(matiere_prog) = self.matiere_prog.get(&id_matiere_prog) {
+                                        
+            let matiere = matiere_prog.get_matiere() ;
+            let id_matiere = matiere.get_id();
+
+
+
+            //suppression des groupes reliées à la matiereprog supprimée
+            let ids_to_remove: Vec<_> = self.classes.iter()
+                .filter(|(_, classe)| classe.get_filiere().get_id() == self.selected_filiere_id)
+                .flat_map(|(id_classe, _)| {
+                    self.groupe.iter()
+                        .filter(move |(_, groupe)| groupe.get_classe().get_id() == *id_classe && groupe.get_matiere().get_id() == id_matiere)
+                        .map(|(id_groupe, _)| id_groupe.clone())
+                })
+                .collect();
+
+            for id_groupe in ids_to_remove {
+                self.groupe.remove(&id_groupe);
+            }
+
+            //suppression des assignation reliées à la matiereprog supprimée
+            let ids_to_remove: Vec<_> = 
+                self.assignement.iter()
+                .filter(|(_, assignement)|{assignement.get_matiere_prog().get_id() == matiere_prog.get_id()})
+                .map(|(id_assignement, _)|{id_assignement.clone()})
+                .collect();
+            
+            for id_assignement in ids_to_remove {
+                self.assignement.remove(&id_assignement);
+            }
+
+            //suppression des interclasse reliées à la matiereprog supprimée   
+            let ids_to_remove: Vec<_> = 
+                self.matiere_inter_classe.iter()
+                .filter(|(_, inter_classe)|{inter_classe.get_matiere_prog().get_id() == matiere_prog.get_id()})
+                .map(|(id_inter_classe, _)|{id_inter_classe.clone()})
+                .collect();
+            
+            for id_matiere_inter_classe in ids_to_remove {
+                self.matiere_inter_classe.remove(&id_matiere_inter_classe);
+            }
+        }  
+        //suppression à ajouter, assignement si il existe , pour chaque classe, interclasse egalement, faire le tour des listes de ce script
+        self.matiere_prog.remove(&id_matiere_prog); 
+        self.select_matiere_prog_remove_id = None
+
+    }
+
+
+    pub fn supprime_option(&mut self, id_option: usize){
+        
+        let ids_to_remove: Vec<_> = 
+                self.matiere_prog.iter()
+                .filter(|(_, matiere_prog)|{matiere_prog.get_option().get_id() == &id_option})
+                .map(|(id_matiere_prog, _)|{id_matiere_prog.clone()})
+                .collect();
+            
+        for id_matiere_prog in ids_to_remove {
+            self.supprime_matiere_prog(id_matiere_prog);
+        }
+
+        //self.nom_option.insert((self.selected_filiere_id, option.get_name()),  option.get_name());
+        let ids_to_remove: Vec<_> = 
+                self.nom_option.iter()
+                .filter(|((id_filiere, _), nom_option)|
+                {
+                    id_filiere == &self.selected_filiere_id
+                    && self.liste_options.get(&id_option).unwrap().get_name() == *nom_option.clone()
+                })
+                .map(|((id_filiere,nom_option), _)|{(*id_filiere,nom_option.clone())})
+                .collect();
+            
+        for (id_filiere,nom_option) in ids_to_remove {
+            self.nom_option.remove(&(id_filiere, nom_option.clone()));
+        }
+
+        self.liste_options.remove(&id_option);
+    }
+
 
 
 
@@ -224,50 +320,25 @@ impl ProgrammeWindow {
     pub fn build(&mut self, ctx: &egui::Context) 
     {
         
+       
+        //si suppression d'une option alors on supprime les matieres_prog renseignées dans cette option ainsi que les dependances de ces matiere progs
+        match self.select_option_remove_id {
+            Some(id_option) =>   {
+                                            self.supprime_option(id_option);
+                                            self.select_option_remove_id = None;
+                                        },
+            None => {self.select_option_remove_id = None;},
+        };
         
-        //egui::TopBottomPanel::top("onglets_filiere") //::new("Création des programmes")
+        //suppression de la matiere prog supprimée et des element qui lui sont liés
         match self.select_matiere_prog_remove_id {
             Some(id) => {  
-                                        /*if let Some(matiere_prog) = self.matiere_prog.get(&id){
-                                            let id_matiere = matiere_prog.get_matiere().get_id();
-                                            
-                                            for(id_classe, classe) in self.classes.iter()
-                                                .filter(|(id_classe, classe)| {classe.get_filiere().get_id() == self.selected_filiere_id}){
-                                                for (id_groupe, groupe) in self.groupe.iter_mut(){
-                                                    if groupe.get_classe().get_id() == *id_classe && groupe.get_matiere().get_id() == id_matiere{
-                                                        self.groupe.remove(&id_groupe);
-                                                    }
-                                                }
-                                            }
-                                            
-                                        }*/
-                                        //if  self.matiere_prog.contains_key(&id) {
-                                        if let Some(matiere_prog) = self.matiere_prog.get(&id) {
-                                            //let matiere_prog = self.matiere_prog.get(&id).unwrap();
-                                            let matiere = matiere_prog.get_matiere() ;
-                                            let id_matiere = matiere.get_id();
-                                
-                                            // Collect ids to remove to avoid modifying the collection while iterating
-                                            let ids_to_remove: Vec<_> = self.classes.iter()
-                                                .filter(|(_, classe)| classe.get_filiere().get_id() == self.selected_filiere_id)
-                                                .flat_map(|(id_classe, _)| {
-                                                    self.groupe.iter()
-                                                        .filter(move |(_, groupe)| groupe.get_classe().get_id() == *id_classe && groupe.get_matiere().get_id() == id_matiere)
-                                                        .map(|(id_groupe, _)| id_groupe.clone())
-                                                })
-                                                .collect();
-                                
-                                            // Remove the collected ids
-                                            for id_groupe in ids_to_remove {
-                                                self.groupe.remove(&id_groupe);
-                                            }
-                                        }  
-                                 
-                                    self.matiere_prog.remove(&id); 
-                                    self.select_matiere_prog_remove_id = None
+                                    self.supprime_matiere_prog(id); 
                                 },
             None => self.select_matiere_prog_remove_id = None
         };
+
+
         self.id_groupe = *self.groupe.keys().max().unwrap_or(&0) + 1;
         self.id_matiere_prog = self.matiere_prog.keys().max().unwrap_or(&0) + 1;
   
@@ -297,9 +368,7 @@ impl ProgrammeWindow {
         
         egui::CentralPanel::default()
             .show(ctx, |ui| {
-                //ui.vertical_centered(|ui| {
-                
-                    
+
                 ui.horizontal(|ui| {
                     for (id_filiere, filiere) in self.filieres.iter() {
                         if ui.selectable_label(&self.selected_filiere_id == id_filiere,format!("{:}", filiere.get_name())).clicked() {                                  
@@ -396,10 +465,7 @@ impl ProgrammeWindow {
                         });    
                         //ui.separator();
                     });
-                        
-                    
-                    //dbg!(&ui.available_width());
-                    //dbg!(&ui.available_size_before_wrap());
+
                     
                     
                
@@ -419,7 +485,7 @@ impl ProgrammeWindow {
                    let custom_region = Rect::from_min_max(
                     pos2(100.0, 100.0),
                     pos2(500.0, 400.0)
-                );
+                    );
                 
                 
                    // Créer une Area à cette positionsition
@@ -763,9 +829,58 @@ impl ProgrammeWindow {
                                             {
                                                 //ui.add_space(50.0);
                                                 let i : usize = 0;
-                                                let ajout_matiere = ui.button("Ajouter").clicked() 
-                                                    && self.liste_selected_matiere.contains_key(&self.selected_filiere_id)
-                                                    && self.nb_heure.get(&self.selected_filiere_id).unwrap_or(&Some(i)) > &Some(i);
+
+
+
+                                                let verif_matiere = if self.liste_selected_matiere.contains_key(&self.selected_filiere_id){ true } else { false };
+                                                let verif_duree_minimum = if self.duree_minimum.contains_key(&self.selected_filiere_id){ true } else { false };
+                                                let verif_duree_maximum = if self.duree_maximum.contains_key(&self.selected_filiere_id){ true } else { false };
+                                                let verif_option = if self.selected_option.len() > 1 { true } else { false };
+                                                let verif_en_groupe = 
+                                                    match self.selected_en_groupe.get(&self.selected_filiere_id){
+                                                        Some(en_groupe) => {
+                                                                                        if !en_groupe {true} 
+                                                                                        else{
+                                                                                            match self.nb_groupe.get(&self.selected_filiere_id){
+                                                                                                Some(nb_groupe) => {if *nb_groupe > Some(0) {true} else {false} },
+                                                                                                None => false,
+                                                                                            } 
+                                                                                        }
+                                                                                  },
+                                                        None => true,
+                                                    };
+                                                let verif_nb_heure = 
+                                                    match self.nb_heure.get(&self.selected_filiere_id){
+                                                        Some(heure) => if *heure > Some(0) {true} else {false},
+                                                        None => false,
+                                                    };
+
+                                                let mut verif_controle_duree = false;
+                                                if verif_duree_minimum && verif_duree_maximum {
+                                                    if self.duree_minimum.get(&self.selected_filiere_id).unwrap() <= self.duree_maximum.get(&self.selected_filiere_id).unwrap() && self.duree_minimum.get(&self.selected_filiere_id).unwrap().unwrap() > 0 {
+                                                        verif_controle_duree = true;
+                                                    }
+                                                }
+
+                                                let mut verif_controle_nb_heure = false;
+                                                if verif_duree_maximum && verif_nb_heure{
+                                                    if self.nb_heure.get(&self.selected_filiere_id).unwrap() >= self.duree_maximum.get(&self.selected_filiere_id).unwrap(){
+                                                        verif_controle_nb_heure = true;
+                                                    } 
+                                                }
+
+
+                                                let ajout_matiere = 
+                                                        ui.button("Ajouter").clicked() 
+                                                        && verif_matiere
+                                                        && verif_duree_minimum
+                                                        && verif_duree_maximum
+                                                        && verif_option
+                                                        && verif_en_groupe
+                                                        && verif_nb_heure
+                                                        && verif_controle_duree
+                                                        && verif_controle_nb_heure;
+                                                
                                                 self.ajout_matiere = ajout_matiere;
                                             });
                      
@@ -804,8 +919,10 @@ impl ProgrammeWindow {
                             let i: usize = 0;                  
                             for (cle, semaine) in self.semaines.iter().filter(|(id,_semaine)| {id.0 == self.selected_filiere_id}){
                                 if self.selected_semaines.contains_key(&(cle)){
+                                    dbg!(&self.duree_minimum);
                                     self.matiere_prog.insert(
                                         self.id_matiere_prog, 
+                                        
                                         Arc::new(MatiereProg::new( self.id_matiere_prog,
                                                              Arc::clone(self.liste_selected_matiere.get(&self.selected_filiere_id).unwrap()),
                                                              self.nb_heure.get(&self.selected_filiere_id).unwrap().unwrap(), 
@@ -864,7 +981,13 @@ impl ProgrammeWindow {
                                     
                                     ui.vertical(|ui|{
                                        
-                                        ui.heading(option.get_name());
+                                        ui.horizontal(|ui|{
+                                            ui.heading(option.get_name());
+                                            if ui.button("❌").clicked(){
+                                                self.select_option_remove_id = Some(id.clone());
+                                            }
+                                        });
+                                        
                                      
                                         egui::Grid::new(option.get_id())//option.get_id()
                                         .num_columns(8)

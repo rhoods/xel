@@ -186,11 +186,13 @@ fn creation_table() -> Result<()> {
                         id_prof INTEGER,
                         id_groupe INTEGER,
                         id_option INTEGER,
+                        id_matiere_prog INTEGER,
                         FOREIGN KEY (id_classe) REFERENCES Classe(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_matiere) REFERENCES Matiere(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_prof) REFERENCES Prof(id) ON DELETE CASCADE,
                         FOREIGN KEY (id_groupe) REFERENCES Groupe(id) ON DELETE CASCADE,
-                        FOREIGN KEY (id_option) REFERENCES Option(id) ON DELETE CASCADE
+                        FOREIGN KEY (id_option) REFERENCES Option(id) ON DELETE CASCADE,
+                        FOREIGN KEY (id_matiere_prog) REFERENCES MatiereProg(id) ON DELETE CASCADE
                     )",
         ()
     )?;

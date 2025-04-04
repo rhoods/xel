@@ -357,12 +357,14 @@ impl  SchedulerApp {
             self.classes = self.classe_window.get_liste_classe().clone();
     }
     fn show_programs_window(&mut self, ctx: &Context) {
-            self.programme_window.charge(self.groupe.clone(), self.semaines.clone(), self.matieres_prog.clone(), self.filieres.clone(), self.classes.clone(), self.matieres.clone(), self.rooms_types.clone(), self.liste_options.clone());
+            self.programme_window.charge(self.groupe.clone(), self.semaines.clone(), self.matieres_prog.clone(), self.filieres.clone(), self.classes.clone(), self.matieres.clone(), self.rooms_types.clone(), self.liste_options.clone(), self.assignement.clone(), self.matieres_inter_classe.clone());
             self.programme_window.build(ctx);
             self.semaines = self.programme_window.get_liste_semaine().clone();
             self.liste_options = self.programme_window.get_liste_options().clone();
             self.matieres_prog = self.programme_window.get_liste_matiere_prog().clone();
             self.groupe = self.programme_window.get_groupe().clone();
+            self.assignement = self.programme_window.get_assignement().clone();
+            self.matieres_inter_classe = self.programme_window.get_matiere_inter_classe().clone();
             //dbg!(&self.groupe);
     }
 
@@ -440,10 +442,10 @@ impl  SchedulerApp {
         //sauvegarde programme
         //let mut insert_programme = conn.prepare("INSERT INTO Programme (id, nb_semaine, id_filiere) VALUES (?1, ?2, ?3)")?;
         let mut insert_semaine = conn.prepare("INSERT INTO Semaine (id_semaine, id_filiere) VALUES (?1, ?2)")?;
-        let mut insert_matiere_prog = conn.prepare("INSERT INTO MatiereProg (id, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)")?;
+        let mut insert_matiere_prog = conn.prepare("INSERT INTO MatiereProg (id, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse, id_option ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)")?;
         let mut insert_en_groupe_inter_classe = conn.prepare("INSERT INTO MatiereInterClasse (id, id_matiere, id_classe) VALUES (?1, ?2, ?3)")?;
-        let mut insert_groupe = conn.prepare("INSERT INTO Groupe (id, id_matiere,id_classe) values (?1, ?2, ?3)")?;
-        let mut insert_assignement = conn.prepare("INSERT INTO Assignement (id, id_classe, id_matiere, id_prof, id_groupe) values (?1, ?2, ?3, ?4, ?5)")?;
+        let mut insert_groupe = conn.prepare("INSERT INTO Groupe (id, name, id_matiere,id_classe) values (?1, ?2, ?3, ?4)")?;
+        let mut insert_assignement = conn.prepare("INSERT INTO Assignement (id, id_classe, id_matiere, id_prof, id_groupe, id_matiere_prog) values (?1, ?2, ?3, ?4, ?5, ?6)")?;
         /*for (cle, programme) in self.programmes.iter() {
             insert_programme.execute(rusqlite::params![cle, programme.get_nb_semaine(), programme.get_filiere().get_id()])?;
         }*/
@@ -452,7 +454,7 @@ impl  SchedulerApp {
         }
 
         for(cle_matiere_prog, matiere_prog) in self.matieres_prog.iter() {
-            insert_matiere_prog.execute(rusqlite::params![cle_matiere_prog, matiere_prog.get_semaine().get_id(),matiere_prog.get_semaine().get_filiere().get_id() , matiere_prog.get_matiere().get_id(), matiere_prog.get_nb_heure() , matiere_prog.get_duree_minimum() , matiere_prog.get_duree_maximum() ,matiere_prog.get_en_groupe(),matiere_prog.get_nb_groupe(), matiere_prog.get_en_groupe_inter_classe()])?;
+            insert_matiere_prog.execute(rusqlite::params![cle_matiere_prog, matiere_prog.get_semaine().get_id(),matiere_prog.get_semaine().get_filiere().get_id() , matiere_prog.get_matiere().get_id(), matiere_prog.get_nb_heure() , matiere_prog.get_duree_minimum() , matiere_prog.get_duree_maximum() ,matiere_prog.get_en_groupe(),matiere_prog.get_nb_groupe(), matiere_prog.get_en_groupe_inter_classe(), matiere_prog.get_option().get_id()])?;
         }
         // selected_liste_classe: HashMap<(usize,usize,usize), Arc<Classe>>, //(id_classe,id_matiere_prog i), id_classe  
         
@@ -460,11 +462,11 @@ impl  SchedulerApp {
 
         //dbg!(&self.groupe);
         for (cle_groupe, groupe) in self.groupe.iter(){
-            insert_groupe.execute(rusqlite::params![cle_groupe, groupe.get_matiere().get_id(), groupe.get_classe().get_id()])?;
+            insert_groupe.execute(rusqlite::params![cle_groupe, cle_groupe, groupe.get_matiere().get_id(), groupe.get_classe().get_id()])?;
         }
 
         for (cle_assignement, assignement) in self.assignement.iter(){
-            insert_assignement.execute(rusqlite::params![cle_assignement, assignement.get_classe().get_id(), assignement.get_matiere().get_id(), assignement.get_prof().get_id(), assignement.get_groupe().get_id()])?;
+            insert_assignement.execute(rusqlite::params![cle_assignement, assignement.get_classe().get_id(), assignement.get_matiere().get_id(), assignement.get_prof().get_id(), assignement.get_groupe().get_id(), assignement.get_matiere_prog().get_id()])?;
         }
         //modification à faire sur la saisie et le stockage des cours interclasse
         //
@@ -706,7 +708,7 @@ impl  SchedulerApp {
 
         
        
-        let mut recup_assignement = conn.prepare("SELECT id,  id_classe, id_matiere, id_prof, id_groupe, id_option FROM Assignement")?;
+        let mut recup_assignement = conn.prepare("SELECT id,  id_classe, id_matiere, id_prof, id_groupe, id_option, id_matiere_prog FROM Assignement")?;
       
         let rows = recup_assignement.query_map([], |row| {
             let id_assignement: usize = row.get(0)?;
@@ -715,13 +717,14 @@ impl  SchedulerApp {
             let id_prof: usize = row.get(3)?;
             let id_groupe: usize = row.get(4)?;
             let id_option: usize = row.get(5)?;
-            Ok((id_assignement, id_classe, id_matiere, id_prof, id_groupe, id_option))
+            let id_matiere_prog: usize = row.get(5)?;
+            Ok((id_assignement, id_classe, id_matiere, id_prof, id_groupe, id_option,id_matiere_prog))
         })?;
 
         for row in rows {
-            let (id_assignement, id_classe, id_matiere, id_prof, id_groupe, id_option) = row?;
-            match (self.matieres.get_key_value(&id_matiere), self.classes.get_key_value(&id_classe), self.teachers.get_key_value(&id_prof), self.groupe.get_key_value(&id_groupe), self.liste_options.get_key_value(&id_option)) {
-                (Some(matiere), Some(classe), Some(prof), Some(groupe), Some(option)) => self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement, Arc::clone(classe.1), Arc::clone(matiere.1), Arc::clone(groupe.1) , prof.1.clone(), Arc::clone(option.1)))),
+            let (id_assignement, id_classe, id_matiere, id_prof, id_groupe, id_option,id_matiere_prog) = row?;
+            match (self.matieres.get_key_value(&id_matiere), self.classes.get_key_value(&id_classe), self.teachers.get_key_value(&id_prof), self.groupe.get_key_value(&id_groupe), self.liste_options.get_key_value(&id_option), self.matieres_prog.get_key_value(&id_matiere_prog)) {
+                (Some(matiere), Some(classe), Some(prof), Some(groupe), Some(option), Some(matiere_prog)) => self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement, Arc::clone(classe.1), Arc::clone(matiere.1), Arc::clone(groupe.1) , prof.1.clone(), Arc::clone(option.1), Arc::clone(matiere_prog.1)))),
                 _ => None,
             };
         }

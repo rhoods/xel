@@ -57,11 +57,12 @@ pub struct Assignation  {
     groupe : Arc<Groupe>,
     prof: Teacher,
     option: Arc<OptionProgramme>,
+    matiere_prog: Arc<MatiereProg>,
 
 }
 
 impl Assignation {
-    pub fn new( id: usize, classe: Arc<Classe>, matiere: Arc<Matiere>, groupe: Arc<Groupe>, prof: Teacher,option: Arc<OptionProgramme>,) -> Self{
+    pub fn new( id: usize, classe: Arc<Classe>, matiere: Arc<Matiere>, groupe: Arc<Groupe>, prof: Teacher,option: Arc<OptionProgramme>,matiere_prog: Arc<MatiereProg>,) -> Self{
         Self {
             id,
             matiere,
@@ -69,6 +70,7 @@ impl Assignation {
             groupe,
             prof,
             option,
+            matiere_prog,
         }
     }
 
@@ -83,6 +85,12 @@ impl Assignation {
     }
     pub fn get_prof(&self) -> &Teacher  {
         &self.prof
+    }
+    pub fn get_option(&self) -> &Arc<OptionProgramme>  {
+        &self.option
+    }
+    pub fn get_matiere_prog(&self) -> &Arc<MatiereProg>  {
+        &self.matiere_prog
     }
 
 

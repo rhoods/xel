@@ -261,10 +261,10 @@ impl AssignationWindow {
                                                                                         if id_ass.is_ok(){
                                                                                             match id_ass.unwrap() {
                                                                                                 Some(id_assignement) => {
-                                                                                                                                self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement,Arc::clone(classe), Arc::clone(matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme))));
+                                                                                                                                self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement,Arc::clone(classe), Arc::clone(matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme), Arc::clone(matiere_prog))));
                                                                                                                                 },
                                                                                                 None => {
-                                                                                                            self.assignement.insert(self.id_assignement, Arc::new(Assignation::new(self.id_assignement,Arc::clone(classe), Arc::clone(&matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme))));
+                                                                                                            self.assignement.insert(self.id_assignement, Arc::new(Assignation::new(self.id_assignement,Arc::clone(classe), Arc::clone(&matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme), Arc::clone(matiere_prog))));
                                                                                                             self.id_assignement += 1;
                                                                                                         },
                                                                                             }
