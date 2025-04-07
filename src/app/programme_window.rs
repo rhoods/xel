@@ -157,6 +157,7 @@ impl ProgrammeWindow {
         &self.matiere_inter_classe
     }
 
+
     pub fn charge(&mut self, groupe: HashMap<usize, Arc<Groupe>>,semaines: HashMap<(usize,usize), Arc<Semaine>>, matiere_prog: HashMap<usize, Arc<MatiereProg>>,  filieres: HashMap<usize, Arc<Filiere>>, classes: HashMap<usize, Arc<Classe>>, matieres: HashMap<usize, Arc<Matiere>>, salles_type: HashMap<usize, Arc<RoomType>>, liste_options: HashMap<usize, Arc<OptionProgramme>>,  assignement :HashMap<usize, Arc<Assignation>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, ) {
         
             self.groupe = groupe;
@@ -192,6 +193,33 @@ impl ProgrammeWindow {
 
     }
 
+
+    /*pub fn init_variables(&mut self){
+
+        let verif_matiere = if self.liste_selected_matiere.contains_key(&self.selected_filiere_id){ true } else { false };
+        let verif_duree_minimum = if self.duree_minimum.contains_key(&self.selected_filiere_id){ true } else { false };
+        let verif_duree_maximum = if self.duree_maximum.contains_key(&self.selected_filiere_id){ true } else { false };
+        let verif_option = if self.selected_option.len() > 1 { true } else { false };
+        let verif_en_groupe = 
+            match self.selected_en_groupe.get(&self.selected_filiere_id){
+                Some(en_groupe) => {
+                                                if !en_groupe {true} 
+                                                else{
+                                                    match self.nb_groupe.get(&self.selected_filiere_id){
+                                                        Some(nb_groupe) => {if *nb_groupe > Some(0) {true} else {false} },
+                                                        None => false,
+                                                    } 
+                                                }
+                                            },
+                None => true,
+            };
+        let verif_nb_heure = 
+            match self.nb_heure.get(&self.selected_filiere_id){
+                Some(heure) => if *heure > Some(0) {true} else {false},
+                None => false,
+            };
+
+    }*/
 
 
     pub fn fenetre_ajout_option(&mut self, ctx: &egui::Context){
@@ -571,9 +599,11 @@ impl ProgrammeWindow {
                                                                     None => String::new()
                                                                 };    
 
+                                                        
                                                         let response_nb_heure = ui.add(egui::TextEdit::singleline(&mut nb_heure).desired_width(100.0));
                                                         self.new_duree_minimum.insert(self.selected_filiere_id, nb_heure.clone() );
-                                                        if response_nb_heure.lost_focus() {
+                                                        
+                                                        if response_nb_heure.lost_focus() || response_nb_heure.clicked_elsewhere(){
                                                             match self.new_duree_minimum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
                                                                 Ok(nombre) => {
                                                                     if nombre > 0 {
@@ -629,7 +659,8 @@ impl ProgrammeWindow {
                                                         let response_nb_heure = ui.add(egui::TextEdit::singleline(&mut nb_heure).desired_width(mat_liste.rect.size()[0]));
                                                         
                                                         self.new_nb_heure.insert(self.selected_filiere_id, nb_heure.clone() );
-                                                        if response_nb_heure.lost_focus() {
+                                                        
+                                                        if response_nb_heure.lost_focus() || response_nb_heure.clicked_elsewhere(){
                                                             match self.new_nb_heure.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
                                                                 Ok(nombre) => {
                                                                     if nombre > 0 {
@@ -658,7 +689,7 @@ impl ProgrammeWindow {
                                                             
                                                         let response_nb_heure = ui.add(egui::TextEdit::singleline(&mut nb_heure).desired_width(100.0));
                                                         self.new_duree_maximum.insert(self.selected_filiere_id, nb_heure.clone() );
-                                                        if response_nb_heure.lost_focus() {
+                                                        if response_nb_heure.lost_focus()  || response_nb_heure.clicked_elsewhere(){
                                                             match self.new_duree_maximum.get(&self.selected_filiere_id).unwrap().parse::<usize>() {
                                                                 Ok(nombre) => {
                                                                     if nombre > 0 {
@@ -679,17 +710,19 @@ impl ProgrammeWindow {
                                                         if *self.selected_en_groupe.get(&self.selected_filiere_id).unwrap_or(&false) {
                                                             ui.label("Nombre de groupes: ");
                                                             let response_nb_groupe = ui.text_edit_singleline(&mut self.new_nb_groupe);
-                                                            if response_nb_groupe.lost_focus() {
+                                                            if response_nb_groupe.lost_focus()  || response_nb_heure.clicked_elsewhere(){
                                                                 match self.new_nb_groupe.parse::<usize>() {
                                                                     Ok(nombre) => {
                                                                         if nombre > 0 {
                                                                             self.nb_groupe.insert(self.selected_filiere_id, Some(nombre));
                                                                         } else {
                                                                             self.new_nb_groupe.clear();
+                                                                            self.nb_groupe.insert(self.selected_filiere_id, Some(0));
                                                                         }  
                                                                     },
                                                                     Err(_) => {
                                                                         self.new_nb_groupe.clear();
+                                                                        self.nb_groupe.insert(self.selected_filiere_id, Some(0));
                                                                     }
                                                                 }
                                                             }
@@ -857,21 +890,20 @@ impl ProgrammeWindow {
 
                                                 let mut verif_controle_duree = false;
                                                 if verif_duree_minimum && verif_duree_maximum {
-                                                    if self.duree_minimum.get(&self.selected_filiere_id).unwrap() <= self.duree_maximum.get(&self.selected_filiere_id).unwrap() && self.duree_minimum.get(&self.selected_filiere_id).unwrap().unwrap() > 0 {
+                                                    if self.duree_minimum.get(&self.selected_filiere_id).unwrap().unwrap() <= self.duree_maximum.get(&self.selected_filiere_id).unwrap().unwrap() && self.duree_minimum.get(&self.selected_filiere_id).unwrap().unwrap() > 0 {
                                                         verif_controle_duree = true;
                                                     }
                                                 }
 
                                                 let mut verif_controle_nb_heure = false;
                                                 if verif_duree_maximum && verif_nb_heure{
-                                                    if self.nb_heure.get(&self.selected_filiere_id).unwrap() >= self.duree_maximum.get(&self.selected_filiere_id).unwrap(){
+                                                    if self.nb_heure.get(&self.selected_filiere_id).unwrap().unwrap() >= self.duree_maximum.get(&self.selected_filiere_id).unwrap().unwrap(){
                                                         verif_controle_nb_heure = true;
                                                     } 
                                                 }
 
-
                                                 let ajout_matiere = 
-                                                        ui.button("Ajouter").clicked() 
+                                                        ui.button("Ajouter").clicked() //ui.button("Ajouter").clicked() 
                                                         && verif_matiere
                                                         && verif_duree_minimum
                                                         && verif_duree_maximum

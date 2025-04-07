@@ -5,7 +5,7 @@ use std::io::Write;
 use rusqlite::{params, Connection, Result};
 
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 
 use crate::struc::horaire::{CreneauxEtablissement, TypeCreneau};
@@ -85,7 +85,7 @@ pub struct SchedulerApp{
     semaines: HashMap<(usize,usize),Arc<Semaine>>,
     matieres_prog: HashMap<usize,Arc<MatiereProg>>,
     matieres_inter_classe: HashMap<usize,Arc<MatiereInterClasse>>,
-    selected_liste_inter_classe: HashMap<(usize,usize,usize), usize>,
+    selected_liste_inter_classe: HashMap<(usize,usize), HashSet<usize>>,
 
     // Données temporaires pour les nouvelles entrées
     new_teacher: String,
@@ -115,6 +115,9 @@ pub struct SchedulerApp{
     assignation_window: AssignationWindow,
     planning_window: PlanningWindow,
     liste_options: HashMap<usize, Arc<OptionProgramme>>,
+
+
+    use_dark_mode: bool,
 }
 
 impl  Default for SchedulerApp{
@@ -178,6 +181,7 @@ impl  Default for SchedulerApp{
             planning_window: PlanningWindow::default(),
             liste_options: HashMap::new(),
             
+            use_dark_mode: true,
             
         }
     }
@@ -186,6 +190,9 @@ impl  Default for SchedulerApp{
 impl  eframe::App for SchedulerApp {
     fn update(&mut self,ctx: &Context, _frame: &mut eframe::Frame)
     {
+        
+        
+
         egui::TopBottomPanel::top("top_panel")
         .show(ctx, |ui| {
             egui::menu::bar(ui,   |ui| {
@@ -195,6 +202,14 @@ impl  eframe::App for SchedulerApp {
                     }
                     if ui.button("Charger").clicked() {
                         self.show_validation_charge_window = true; 
+                    }
+                    if ui.selectable_label(self.use_dark_mode, "Sombre").clicked() {
+                        self.use_dark_mode = true;
+                        ctx.set_visuals(egui::Visuals::dark());
+                    }
+                    if ui.selectable_label(!self.use_dark_mode, "Clair").clicked() {
+                        self.use_dark_mode = false;
+                        ctx.set_visuals(egui::Visuals::light());
                     }
                     
                 });
@@ -470,8 +485,11 @@ impl  SchedulerApp {
         }
         //modification à faire sur la saisie et le stockage des cours interclasse
         //
-        for ((id_classe, id_matiere, id), classe) in self.selected_liste_inter_classe.iter(){
-            insert_en_groupe_inter_classe.execute(rusqlite::params![id, id_matiere, id_classe])?;
+        for ((id_classe, id_matiere, ), classe) in self.selected_liste_inter_classe.iter(){
+            for id_c in classe.iter(){
+                insert_en_groupe_inter_classe.execute(rusqlite::params![id_c, id_matiere, id_classe])?;
+            }
+            
         }
 
         Ok(())
@@ -679,10 +697,11 @@ impl  SchedulerApp {
             Ok((id_matiere_inter_classe, id_matiere, id_classe))
         })?;
 
+        let mut liste_classe :HashSet<usize> = HashSet::new();
         for row in rows {
             let (id_matiere_inter_classe, id_matiere_prog, id_classe) = row?;
             match (self.matieres_prog.get_key_value(&id_matiere_prog), self.classes.get_key_value(&id_classe) ) {
-                (Some(matiere_prog), Some(classe)) => self.selected_liste_inter_classe.insert((id_classe, id_matiere_prog, id_matiere_inter_classe), id_classe),
+                (Some(matiere_prog), Some(classe)) => {liste_classe.insert(id_classe); self.selected_liste_inter_classe.insert((id_classe, id_matiere_prog), liste_classe.clone())},
                 _ => None,
             };
         }
@@ -900,6 +919,10 @@ impl  SchedulerApp {
             assignation_window: self.assignation_window.clone(),
             planning_window: self.planning_window.clone(),
             liste_options: self.liste_options.clone(),
+
+
+            
+            use_dark_mode: self.use_dark_mode.clone(),
         }
     }
 }

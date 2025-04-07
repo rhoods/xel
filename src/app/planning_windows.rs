@@ -41,7 +41,7 @@ pub struct PlanningWindow {
     planning_classe: HashMap<(usize,usize), Planning>, //(id_classe, num semaine), planning
     planning_room: HashMap<(usize,usize,usize), Planning>, //(id_room,id_type_salle, num semaine), planning
     
-    selected_liste_inter_classe: HashMap<(usize,usize,usize), usize>,
+    selected_liste_inter_classe: HashMap<(usize,usize), HashSet<usize>>,
     semaine: HashMap<(usize,usize), Arc<Semaine>>,
     classe: HashMap<usize, Arc<Classe>>,
     filiere: HashMap<usize, Arc<Filiere>>,
@@ -89,7 +89,7 @@ impl  Default for PlanningWindow  {
 }
 
 impl PlanningWindow {
-    pub fn charge(&mut self, salle:HashMap<usize, Room>,  semaine: HashMap<(usize,usize), Arc<Semaine>>, classe: HashMap<usize, Arc<Classe>>, filiere: HashMap<usize, Arc<Filiere>>, matiere:HashMap<usize, Arc<Matiere>>,   matiere_prog: HashMap<usize, Arc<MatiereProg>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, teachers: HashMap<usize, Teacher>, groupe: HashMap<usize, Arc<Groupe>>,  assignement :HashMap<usize, Arc<Assignation>>, horaires: HashMap<(usize,usize), CreneauxEtablissement>, selected_liste_inter_classe: HashMap<(usize, usize, usize), usize>) {
+    pub fn charge(&mut self, salle:HashMap<usize, Room>,  semaine: HashMap<(usize,usize), Arc<Semaine>>, classe: HashMap<usize, Arc<Classe>>, filiere: HashMap<usize, Arc<Filiere>>, matiere:HashMap<usize, Arc<Matiere>>,   matiere_prog: HashMap<usize, Arc<MatiereProg>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, teachers: HashMap<usize, Teacher>, groupe: HashMap<usize, Arc<Groupe>>,  assignement :HashMap<usize, Arc<Assignation>>, horaires: HashMap<(usize,usize), CreneauxEtablissement>, selected_liste_inter_classe: HashMap<(usize,usize), HashSet<usize>>) {
         self.semaine = semaine;
         self.classe =  classe;
         self.filiere = filiere;
@@ -414,25 +414,27 @@ impl PlanningWindow {
                         },
             };
 
-            for ((id_classe_select, id_matiere_select, id_classe_participante), _) in self.selected_liste_inter_classe.iter()
-            .filter(|((id_classe_select, id_matiere_select, id_classe_participante), _)| 
+            for ((id_classe_select, id_matiere_select), classes_hashset) in self.selected_liste_inter_classe.iter()
+            .filter(|((id_classe_select, id_matiere_select,),classes_hashset)| 
             {
                 *id_classe_select == id_classe
                 && *id_matiere_select == *id_matiere
             })
             {
+                for id_classe_participante in classes_hashset.iter(){
                 //dbg!(&id_classe_participante);
-                match liste_classe.get_mut(&(id_classe,*id_matiere)){
-                    Some(classes) => 
-                            {   
-                                classes.insert(*id_classe_participante);
-                            },
-                    None => {
-                                let mut classes = HashSet::new();
-                                classes.insert(*id_classe_participante);
-                                liste_classe.insert((id_classe, *id_matiere), classes);
-                            },
-                };
+                    match liste_classe.get_mut(&(id_classe,*id_matiere)){
+                        Some(classes) => 
+                                {   
+                                    classes.insert(*id_classe_participante);
+                                },
+                        None => {
+                                    let mut classes = HashSet::new();
+                                    classes.insert(*id_classe_participante);
+                                    liste_classe.insert((id_classe, *id_matiere), classes);
+                                },
+                    };
+                }
             }
             // pour les cas qui ne sont pas en cours interclasse
             if liste_classe.get_mut(&(id_classe,*id_matiere)).is_none(){

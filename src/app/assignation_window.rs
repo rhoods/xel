@@ -34,7 +34,7 @@ pub struct AssignationWindow {
     selected_option_id: Option<usize>,
     selected_prof: HashMap<(usize,usize,usize), usize>, //(id_classe, id_matiere, id_groupe), id_prof
     selected_all: HashMap<(usize, usize),bool>, //(id_classe,id_matiere_prog)
-    selected_liste_classe: HashMap<(usize,usize,usize), usize>, //(id_classe,id_matiere_prog i), id_classe   ////Arc<Classe>
+    selected_liste_classe: HashMap<(usize,usize), HashSet<usize>>, //(id_classe,id_matiere_prog i), id_classe   ////Arc<Classe>
 }
 
 
@@ -77,12 +77,12 @@ impl AssignationWindow {
                                                                                                                                                                                                                
     }
 
-    pub fn get_selected_inter_classe(&self) -> &HashMap<(usize,usize,usize), usize>{
+    pub fn get_selected_inter_classe(&self) -> &HashMap<(usize,usize), HashSet<usize>>{
         &self.selected_liste_classe                                                                                                                                                                          
                                                                                                                                                                                                                
     }
 
-    pub fn charge(&mut self, semaine: HashMap<(usize,usize), Arc<Semaine>>, classe: HashMap<usize, Arc<Classe>>, filiere: HashMap<usize, Arc<Filiere>>, matiere:HashMap<usize, Arc<Matiere>>,   matiere_prog: HashMap<usize, Arc<MatiereProg>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, teachers: HashMap<usize, Teacher>, groupe: HashMap<usize, Arc<Groupe>>,  assignement :HashMap<usize, Arc<Assignation>>, selected_liste_classe: HashMap<(usize,usize,usize), usize>) {
+    pub fn charge(&mut self, semaine: HashMap<(usize,usize), Arc<Semaine>>, classe: HashMap<usize, Arc<Classe>>, filiere: HashMap<usize, Arc<Filiere>>, matiere:HashMap<usize, Arc<Matiere>>,   matiere_prog: HashMap<usize, Arc<MatiereProg>>, matiere_inter_classe: HashMap<usize, Arc<MatiereInterClasse>>, teachers: HashMap<usize, Teacher>, groupe: HashMap<usize, Arc<Groupe>>,  assignement :HashMap<usize, Arc<Assignation>>, selected_liste_classe: HashMap<(usize,usize), HashSet<usize>>) {
         
         self.semaine = semaine;
         self.classe =  classe;
@@ -223,11 +223,12 @@ impl AssignationWindow {
                                                             Some(sel) => {sel.clone()},
                                                             None => 
                                                                 
-                                                                if let Some((id,name)) = self.teachers.iter().next(){
-                                                                    name.get_name()
-                                                                }else{
+                                                                //if let Some((id,name)) = self.teachers.iter().next(){
+                                                                //    name.get_name()
+                                                                //}else{
                                                                     " ".to_string()
-                                                                },
+                                                                //}
+                                                                ,
                                                         };
                                                         
                                                         //dbg!(&self.selected_option.get(&(self.selected_classe_id.unwrap(),*matiere_prog.get_matiere().get_id(), i)));
@@ -297,55 +298,52 @@ impl AssignationWindow {
                                                         .id_source(id_matiere_prog)
                                                         .auto_shrink([false, true])   
                                                         .show(ui, |ui| {  
+                                                       
+                                                            let mut sel: HashSet<usize> = HashSet::new();
                                                             
-                                                            /*let mut i: usize = 0;
-                                                            let mut selected = match self.selected_all.get(&(self.selected_classe_id.unwrap(),id_matiere_prog.1)){
-                                                                Some(select) => *select,
-                                                                None => false,
+                                                            match self.selected_liste_classe.get(&(self.selected_classe_id.unwrap(), id_matiere_prog.1)){
+                                                                Some(classes) => {sel = classes.clone();},
+                                                                None => {},
                                                             };
-                                                        
-                                                            if ui.checkbox(&mut selected, format!("Toutes")).changed() {
-                                                                self.selected_all.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1), selected);
-                                                                for (_cle,option) in options.iter().enumerate(){
-                                                                    if selected{
-                                                                        self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,option.get_id()),self.selected_classe_id.unwrap());   //Arc::clone(option)
-                                                                    }else {
-                                                                        self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, option.get_id()));
-                                                                    }
-                                                                    i += 1 ;
-                                                                }
-                                                            }*/
-    
-                                                            //i = 0;
+                                                    
+                                                            
                                                             for (_cle,option) in options.iter().enumerate(){
-                                                                //for (_cle2,option2) in options.iter().enumerate(){
-                                                                    let mut selected = self.selected_liste_classe.contains_key(&(self.selected_classe_id.unwrap(), id_matiere_prog.1, option.get_id()));
-                                                                    //let mut selected = self.selected_liste_classe.contains_key(&(option.get_id(), id_matiere_prog.1, option.get_id()));
-                                                                    if ui.checkbox(&mut selected, format!("{:}",option.get_name())).changed() {
-                                                                        
+                                                                   let  mut selected = sel.contains(&option.get_id());
+                                                                   if ui.checkbox(&mut selected, format!("{:}",option.get_name())).changed() {
                                                                             if selected {
-                                                                                self.selected_liste_classe.insert((self.selected_classe_id.unwrap(), id_matiere_prog.1,option.get_id()), self.selected_classe_id.unwrap());// Arc::clone(option)
-                                                                                //self.selected_liste_classe.insert((option.get_id(), id_matiere_prog.1,option.get_id()), option.get_id());
+                                                                                
+                                                                                //si pour cette matiere la classe est déjà présente dans un hashset qui n'est pas identique à que l'on regarde, alors on ne peut pas selectionner cette classe
+                                                                                //sinon risque de conflits
+                                                                                let mut ok = true;
+                                                                                //let mut count = 0;
+                                                                                for ((id_classe_verif, id_matiere_verif), classes_verif) in  self.selected_liste_classe.iter()
+                                                                                    .filter(|((id_classe_verif, id_matiere_verif), classes_verif) |
+                                                                                        {
+                                                                                            option.get_id() == *id_classe_verif && *id_matiere_verif == id_matiere_prog.1 && *classes_verif != &sel
+                                                                                        })
+                                                                                        
+                                                                                {
+                                                                                    ok = false;
+                                                                                    //count +=1;
+                                                                                    break;
+                                                                                }
+                                                                                
+                                                                                if ok {
+                                                                                    sel.insert(self.selected_classe_id.unwrap());
+                                                                                    sel.insert(option.get_id());
+                                                                                }
+
                                                                             } else {
-                                                                                //self.selected_liste_classe.remove(&(option.get_id(), id_matiere_prog.1,option.get_id()));
-                                                                                //self.selected_all.insert((option.get_id(),id_matiere_prog.1), false);
-                                                                                self.selected_liste_classe.remove(&(self.selected_classe_id.unwrap(),id_matiere_prog.1, option.get_id()));
-                                                                                self.selected_all.insert((self.selected_classe_id.unwrap(),id_matiere_prog.1), false);
+                                                                                sel.remove(&option.get_id());
+                                                                                self.selected_liste_classe.remove(&(option.get_id(), id_matiere_prog.1));
                                                                             }
-                                                                        
                                                                     }
-                                                                //}
-                                                               // i += 1 ;
+                                                            }
+
+                                                            for classe in sel.iter(){
+                                                                    self.selected_liste_classe.insert((*classe,id_matiere_prog.1), sel.clone());
                                                             }
                                                             
-                                                            let mut selected_liste_classe: HashMap<(usize,usize,usize), usize> = HashMap::new();
-                                                            for ((classe_saisie, matiere,classe), _val) in self.selected_liste_classe.iter(){
-                                                                selected_liste_classe.insert((*classe_saisie, *matiere, *classe), *classe_saisie);
-                                                                selected_liste_classe.insert((*classe, *matiere, *classe), *classe);
-                                                                selected_liste_classe.insert((*classe, *matiere, *classe_saisie), *classe);
-                                                            }
-                                                            self.selected_liste_classe = selected_liste_classe;
-    
                                                         });
                                                     });
                                                 });
