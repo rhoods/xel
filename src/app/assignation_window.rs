@@ -103,6 +103,8 @@ impl AssignationWindow {
             let groupe =  assignation.get_groupe();
             //dbg!(&prof);
             //dbg!(&classe);
+            
+                                                                                   
             //dbg!(&matiere);
             //dbg!(&groupe);
             self.selected_prof.insert((classe.get_id(), *matiere.get_id(), *groupe.get_id()), prof.get_id());
@@ -167,7 +169,8 @@ impl AssignationWindow {
                         
                                     let mut matiere_id: usize;
                                     for (id, matiere_prog) in self.matiere_prog.iter()
-                                        .filter(|(_id, matiere_prog)| {matiere_prog.get_semaine().get_filiere().get_id() == self.selected_filiere_id 
+                                        .filter(|(_id, matiere_prog)| {
+                                            matiere_prog.get_semaine().get_filiere().get_id() == self.selected_filiere_id 
                                         //&& Some(matiere_prog.get_matiere().get_id()) == self.selected_semaine_onglet.get(&self.selected_filiere_id)
                                         }) 
                                     {
@@ -196,15 +199,15 @@ impl AssignationWindow {
                                                     for i in 0..*matiere_prog.get_nb_groupe() {
                                                         ui.horizontal(|ui| {
                                                             ui.label(format!("Groupe {:}", i + 1));
-                                                            if ui.button("-").clicked() {
+                                                            /*if ui.button("-").clicked() {
                                                                 // Supprimer le groupe
                                                             }
                                                             if i == *matiere_prog.get_nb_groupe() - 1 {
                                                                 if ui.button("+").clicked() {
                                                                     // Ajouter un groupe
                                                                 }
-                                                            }
-                                                            ui.end_row();
+                                                            }*/
+                                                            //ui.end_row();
                                                         });
                                                     }
                                                 });
@@ -251,22 +254,44 @@ impl AssignationWindow {
                                                                                    
                                                                                     let mut verif_assign_exists = conn.prepare("SELECT id FROM Assignement WHERE id_matiere = ?1 and id_classe = ?2 and id_groupe = ?3").expect("Impossible de préparer la requete");
                         
-                                                                                        let mut rows = verif_assign_exists.query(params![id_matiere, id_classe, id_groupe]).expect("Impossible d'executer la requete'");
+                                                                                        let mut rows = verif_assign_exists.query(params![id_matiere, id_classe, id_groupe]).expect("Impossible d'executer la requete");
                                                                                         let mut id_ass: Result<Option<usize>> = Ok(None);
-                                                                                        //for row in rows {
                                                                                
                                                                                         while let Some(row) = rows.next().expect("Impossible de lire la base de données") {
                                                                                             id_ass = row.get(0); //.expect("Impossible de recupérer la données dans la bdd")
-                                                                                   
+                                                        
                                                                                         }
                                                                                         if id_ass.is_ok(){
                                                                                             match id_ass.unwrap() {
                                                                                                 Some(id_assignement) => {
+                                                                                                                                println!("met à jour en base");
+                                                                                                                                dbg!(&id_assignement);
                                                                                                                                 self.assignement.insert(id_assignement, Arc::new(Assignation::new(id_assignement,Arc::clone(classe), Arc::clone(matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme), Arc::clone(matiere_prog))));
                                                                                                                                 },
                                                                                                 None => {
-                                                                                                            self.assignement.insert(self.id_assignement, Arc::new(Assignation::new(self.id_assignement,Arc::clone(classe), Arc::clone(&matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme), Arc::clone(matiere_prog))));
-                                                                                                            self.id_assignement += 1;
+                                                                                                            //ajout de ce controle car si element non inséré en base et changé plusieurs fois, ca créé alors des doublons
+                                                                                                            let mut f_id_assignement:Option<usize> = None;
+                                                                                                            for (id_assignement,assignement) in self.assignement.iter().filter(|(id_assignement,assignement)|
+                                                                                                                {
+                                                                                                                    assignement.get_classe().get_id() == id_classe
+                                                                                                                    && assignement.get_matiere().get_id() == &id_matiere
+                                                                                                                    && assignement.get_groupe().get_id() == &id_groupe
+                                                                                                                })
+                                                                                                            {
+                                                                                                                f_id_assignement = Some(*id_assignement);
+                                                                                                                break;
+                                                                                                            }
+
+                                                                                                            
+                                                                                                            if f_id_assignement.is_none(){
+                                                                                                                println!("nouvelle element en base");
+                                                                                                                dbg!(&self.id_assignement);
+                                                                                                                self.assignement.insert(self.id_assignement, Arc::new(Assignation::new(self.id_assignement,Arc::clone(classe), Arc::clone(&matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme), Arc::clone(matiere_prog))));
+                                                                                                                self.id_assignement += 1;
+                                                                                                            } else{
+                                                                                                                self.assignement.insert(f_id_assignement.unwrap(), Arc::new(Assignation::new(f_id_assignement.unwrap(),Arc::clone(classe), Arc::clone(matiere), Arc::clone(groupe), option.clone(), Arc::clone(&option_programme), Arc::clone(matiere_prog))));
+                                                                                                            }
+                                                                                                            
                                                                                                         },
                                                                                             }
                                                                                         }
@@ -315,7 +340,6 @@ impl AssignationWindow {
                                                                                 //si pour cette matiere la classe est déjà présente dans un hashset qui n'est pas identique à que l'on regarde, alors on ne peut pas selectionner cette classe
                                                                                 //sinon risque de conflits
                                                                                 let mut ok = true;
-                                                                                //let mut count = 0;
                                                                                 for ((id_classe_verif, id_matiere_verif), classes_verif) in  self.selected_liste_classe.iter()
                                                                                     .filter(|((id_classe_verif, id_matiere_verif), classes_verif) |
                                                                                         {
@@ -324,7 +348,6 @@ impl AssignationWindow {
                                                                                         
                                                                                 {
                                                                                     ok = false;
-                                                                                    //count +=1;
                                                                                     break;
                                                                                 }
                                                                                 

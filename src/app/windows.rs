@@ -458,9 +458,9 @@ impl  SchedulerApp {
         //let mut insert_programme = conn.prepare("INSERT INTO Programme (id, nb_semaine, id_filiere) VALUES (?1, ?2, ?3)")?;
         let mut insert_semaine = conn.prepare("INSERT INTO Semaine (id_semaine, id_filiere) VALUES (?1, ?2)")?;
         let mut insert_matiere_prog = conn.prepare("INSERT INTO MatiereProg (id, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse, id_option ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)")?;
-        let mut insert_en_groupe_inter_classe = conn.prepare("INSERT INTO MatiereInterClasse (id, id_matiere, id_classe) VALUES (?1, ?2, ?3)")?;
+        let mut insert_en_groupe_inter_classe = conn.prepare("INSERT INTO MatiereInterClasse (id, id_matiere, id_classe, id_classe_participante) VALUES (?1, ?2, ?3, ?4)")?;
         let mut insert_groupe = conn.prepare("INSERT INTO Groupe (id, name, id_matiere,id_classe) values (?1, ?2, ?3, ?4)")?;
-        let mut insert_assignement = conn.prepare("INSERT INTO Assignement (id, id_classe, id_matiere, id_prof, id_groupe, id_matiere_prog) values (?1, ?2, ?3, ?4, ?5, ?6)")?;
+        let mut insert_assignement = conn.prepare("INSERT INTO Assignement (id, id_classe, id_matiere, id_prof, id_groupe, id_option, id_matiere_prog) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)")?;
         /*for (cle, programme) in self.programmes.iter() {
             insert_programme.execute(rusqlite::params![cle, programme.get_nb_semaine(), programme.get_filiere().get_id()])?;
         }*/
@@ -481,13 +481,14 @@ impl  SchedulerApp {
         }
 
         for (cle_assignement, assignement) in self.assignement.iter(){
-            insert_assignement.execute(rusqlite::params![cle_assignement, assignement.get_classe().get_id(), assignement.get_matiere().get_id(), assignement.get_prof().get_id(), assignement.get_groupe().get_id(), assignement.get_matiere_prog().get_id()])?;
+            insert_assignement.execute(rusqlite::params![cle_assignement, assignement.get_classe().get_id(), assignement.get_matiere().get_id(), assignement.get_prof().get_id(), assignement.get_groupe().get_id(), assignement.get_option().get_id()  ,assignement.get_matiere_prog().get_id()])?;
         }
         //modification à faire sur la saisie et le stockage des cours interclasse
         //
         for ((id_classe, id_matiere, ), classe) in self.selected_liste_inter_classe.iter(){
             for id_c in classe.iter(){
-                insert_en_groupe_inter_classe.execute(rusqlite::params![id_c, id_matiere, id_classe])?;
+
+                insert_en_groupe_inter_classe.execute(rusqlite::params![id_classe, id_matiere, id_classe, id_c])?;
             }
             
         }
@@ -684,26 +685,43 @@ impl  SchedulerApp {
         for row in rows {
             let (id_matiere_prog, id_semaine, id_filiere, id_matiere, nb_heure, duree_minimum, duree_maximum, groupe, nb_groupe, interclasse, id_option) = row?;
             match (self.semaines.get_key_value(&(id_filiere,id_semaine)), self.matieres.get_key_value(&id_matiere), self.liste_options.get_key_value(&id_option) ) {
-                (Some(semaine), Some(matiere), Some(option)) => self.matieres_prog.insert(id_matiere_prog, Arc::new(MatiereProg::new(id_semaine,Arc::clone(matiere.1), nb_heure, duree_minimum, duree_maximum, groupe,  nb_groupe, interclasse, Arc::clone(semaine.1), Arc::clone(option.1))), ),
+                (Some(semaine), Some(matiere), Some(option)) => self.matieres_prog.insert(id_matiere_prog, Arc::new(MatiereProg::new(id_matiere_prog, Arc::clone(matiere.1), nb_heure, duree_minimum, duree_maximum, groupe,  nb_groupe, interclasse, Arc::clone(semaine.1), Arc::clone(option.1))), ),
                 _ => None,
             };
         }
 
-        let mut recup_matiere_inter_classe = conn.prepare("SELECT id, id_matiere, id_classe FROM MatiereInterClasse")?;
+        let mut recup_matiere_inter_classe = conn.prepare("SELECT id, id_matiere, id_classe, id_classe_participante FROM MatiereInterClasse")?;
         let rows = recup_matiere_inter_classe.query_map([], |row| {
             let id_matiere_inter_classe: usize = row.get(0)?;
             let id_matiere: usize = row.get(1)?;
             let id_classe: usize = row.get(2)?;
-            Ok((id_matiere_inter_classe, id_matiere, id_classe))
-        })?;
+            let id_classe_participante: usize = row.get(3)?;
+            Ok((id_matiere_inter_classe, id_matiere, id_classe, id_classe_participante))
+        })?.collect::<Result<Vec<_>, _>>()?;
 
-        let mut liste_classe :HashSet<usize> = HashSet::new();
-        for row in rows {
-            let (id_matiere_inter_classe, id_matiere_prog, id_classe) = row?;
-            match (self.matieres_prog.get_key_value(&id_matiere_prog), self.classes.get_key_value(&id_classe) ) {
-                (Some(matiere_prog), Some(classe)) => {liste_classe.insert(id_classe); self.selected_liste_inter_classe.insert((id_classe, id_matiere_prog), liste_classe.clone())},
-                _ => None,
-            };
+        
+
+        for (id_cla, classe_val) in self.classes.iter(){
+            for (id_mat, matiereprog_val) in self.matieres_prog.iter()
+                .filter(|(id_mat, matiereprog_val)|
+                {
+                    *matiereprog_val.get_en_groupe_inter_classe() && matiereprog_val.get_semaine().get_filiere().get_id() == classe_val.get_filiere().get_id()
+                })
+            {
+                let mut liste_classe :HashSet<usize> = HashSet::new();
+                for (id_matiere_inter_classe, id_matiere, id_classe, id_classe_participante) in rows.iter() 
+                    .filter(|(_,id_matiere, id_classe, _)|
+                    {
+                        id_matiere == matiereprog_val.get_matiere().get_id() && id_classe == id_cla
+                    })
+                {
+                    //let (id_matiere_inter_classe, id_matiere, id_classe, id_classe_participante) = row?;
+                    match (self.matieres_prog.get_key_value(&id_matiere), self.classes.get_key_value(&id_classe) ) {
+                        (Some(matiere_prog), Some(classe)) => {liste_classe.insert(*id_classe_participante); self.selected_liste_inter_classe.insert((*id_classe, *id_matiere), liste_classe.clone())},
+                        _ => None,
+                    };
+                }
+            }
         }
         
 

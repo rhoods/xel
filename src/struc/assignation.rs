@@ -58,7 +58,6 @@ pub struct Assignation  {
     prof: Teacher,
     option: Arc<OptionProgramme>,
     matiere_prog: Arc<MatiereProg>,
-
 }
 
 impl Assignation {

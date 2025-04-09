@@ -773,6 +773,8 @@ impl PlanningWindow {
                                 for i in 0..creneau_dispo.2 {
                                     let mut y: usize = 0;
                                     for (groupe, prof) in liste_groupe.iter(){
+                                        dbg!(&id_salle);
+                                        dbg!(&y);
                                         planning.set_creneau(creneau_dispo.0, creneau_dispo.1 + i, *prof, *id_classe, *groupe, id_salle[y], *id_matiere);
                                         cours_groupe.insert((*groupe, *prof),id_salle[y]);
                                         y += 1;

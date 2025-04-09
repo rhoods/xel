@@ -89,7 +89,7 @@ impl  Default for ProgrammeWindow  {
             //programmes: HashMap::new(),// HashMap::new()
             groupe: HashMap::new(),
             semaines: HashMap::new(),
-            id_matiere_prog:0,
+            id_matiere_prog:1,
             matiere_prog: HashMap::new(),
             matiere_inter_classe: HashMap::new(),
             filieres: HashMap::new(),
@@ -108,7 +108,7 @@ impl  Default for ProgrammeWindow  {
             nb_sem: HashMap::new(),
             nb_sem_deja_valid: HashSet::new(),
 
-            selected_filiere_id: 0,
+            selected_filiere_id: 1,
 
             selected_en_groupe: HashMap::new(), //false,
             selected_en_groupe_interclasse: HashMap::new(), //false,
@@ -124,7 +124,7 @@ impl  Default for ProgrammeWindow  {
             nom_option: HashMap::new(),
             new_nom_option: HashMap::new(),
             liste_options: HashMap::new(),
-            id_option: 0,
+            id_option: 1,
             show_option_window : false,
             select_option_remove_id: None,
         }
@@ -921,14 +921,10 @@ impl ProgrammeWindow {
                                 });
                                 });
                                 }).response;
-                            //});
                         
                  
 
                     //SELECTION DES INFORMATIONS SUR LA MATIERE A AJOUTER
-                    
-                //dbg!(&area_matiere.rect.size());
-                //dbg!(&area_matiere.rect.max.y);
                 let y = area_matiere.rect.max.y;
                 
                 let areat_tableau = egui::Area::new("area_tableau")
@@ -951,7 +947,7 @@ impl ProgrammeWindow {
                             let i: usize = 0;                  
                             for (cle, semaine) in self.semaines.iter().filter(|(id,_semaine)| {id.0 == self.selected_filiere_id}){
                                 if self.selected_semaines.contains_key(&(cle)){
-                                    dbg!(&self.duree_minimum);
+                                  
                                     self.matiere_prog.insert(
                                         self.id_matiere_prog, 
                                         
