@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap,HashSet};
 
 use std::sync::{Arc, Mutex};
 use crate::app::filiere_window::Classe;
@@ -14,10 +14,11 @@ pub struct Creneaux {
     pub id_classe: Option<usize>, //Option<Arc<Classe>>,
     pub id_groupe: Option<usize>,
     pub id_salle: Option<usize>,//Option<Room>,
-    pub id_matiere: Option<usize>,//Option<Room>,
+    pub id_matiere: Option<HashSet<usize>>,//Option<Room>,
     pub actif_ou_repas: Option<TypeCreneau>,
     pub preference: Option<Etat>,
     pub cours_groupe: Option<HashMap<(usize,usize),usize>>, //(groupe, prof), salle
+    pub liste_classe: Option<HashMap<(usize,usize),HashSet<usize>>>, //(matiere, prof), hashset(classe)
 }
 
 impl Creneaux{
@@ -31,6 +32,7 @@ impl Creneaux{
             actif_ou_repas: None,
             preference: None,
             cours_groupe: None,
+            liste_classe: None,
         }
     }
 
@@ -60,7 +62,7 @@ impl Creneaux{
     pub fn get_salle(&self) -> &Option<usize>{ // &Option<Room>{
         &self.id_salle
     }
-    pub fn get_matiere(&self) -> &Option<usize>{ // &Option<Room>{
+    pub fn get_matiere(&self) -> &Option<HashSet<usize>>{ // &Option<Room>{
         &self.id_matiere
     }
 
@@ -76,8 +78,15 @@ impl Creneaux{
     pub fn set_salle(&mut self, salle: Option<usize>) { //Option<Room>) {
         self.id_salle = salle;
     }
-    pub fn set_matiere(&mut self, matiere: Option<usize>) { //Option<Room>) {
+    pub fn set_matiere(&mut self, matiere: Option<HashSet<usize>>) { //Option<Room>) {
         self.id_matiere = matiere;
+    }
+    pub fn add_matiere(&mut self, matiere: usize) { //Option<Room>) {
+        let mut liste_matiere = self.id_matiere.get_or_insert_with(HashSet::new);
+        liste_matiere.insert(matiere);
+        self.id_matiere = Some(liste_matiere.clone());
+
+        
     }
 
     pub fn get_cours_groupe(&self) -> &Option<HashMap<(usize,usize),usize>>{ //&Option<Teacher>{
@@ -85,6 +94,25 @@ impl Creneaux{
     }
     pub fn set_cours_groupe(&mut self, cours_groupe: HashMap<(usize,usize),usize>){ //&Option<Teacher>{
         self.cours_groupe = Some(cours_groupe);
+    }
+
+
+    pub fn get_liste_classe(&self) -> &Option<HashMap<(usize,usize),HashSet<usize>>>{ //&Option<Teacher>{
+        &self.liste_classe
+    }
+
+
+    pub fn add_liste_classe(&mut self, id_matiere: usize, id_prof: usize, id_classe: usize){ 
+        if let Some(map) = self.liste_classe.as_mut() {
+            let entry = map.entry((id_matiere, id_prof)).or_insert_with(HashSet::new);
+            entry.insert(id_classe);
+        } else {
+            let mut map = HashMap::new();
+            let mut new_set = HashSet::new();
+            new_set.insert(id_classe);
+            map.insert((id_matiere, id_prof), new_set);
+            self.liste_classe = Some(map);
+        }
     }
 }
 
@@ -139,7 +167,7 @@ impl Planning {
         self.planning.get(&(id_jour, id_heure))
     }
     
-    pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_groupe: usize, id_salle: usize, id_matiere: usize) {
+    pub fn set_creneau(&mut self, id_jour: usize, id_heure: usize, id_prof: usize, id_classe: usize, id_groupe: usize, id_salle: usize, id_matiere: HashSet<usize>) {
         let creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();   
         creneaux.id_classe =  Some(id_classe);
         creneaux.id_groupe = Some(id_groupe);
@@ -151,6 +179,11 @@ impl Planning {
     pub fn set_creneau_cours_multiple(&mut self, id_jour: usize, id_heure: usize, cours_groupe: HashMap<(usize,usize),usize>){
         let creneaux: &mut Creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();
         creneaux.cours_groupe = Some(cours_groupe); 
+    }
+
+    pub fn set_creneau_cours_interclasse(&mut self, id_jour: usize, id_heure: usize, liste_classe: HashMap<(usize,usize),HashSet<usize>>){
+        let creneaux: &mut Creneaux = self.planning.get_mut(&(id_jour, id_heure)).unwrap();
+        creneaux.liste_classe = Some(liste_classe); 
     }
 
     pub fn reset_creneau(&mut self, id_jour: usize, id_heure: usize) {
